@@ -1,0 +1,356 @@
+{
+  "nav": {
+    "home": "Home",
+    "pricing": "Pricing",
+    "enterprise": "Enterprise", 
+    "features": "Features",
+    "contact": "Contact",
+    "demo": "Demo",
+    "login": "Sign in",
+    "signup": "Get started"
+  },
+  "hero": {
+    "title": "The HRIS that grows with you",
+    "subtitle": "Modular HR solution for West Africa. Multi-country, mobile-first, local compliance.",
+    "description": "Manage your teams from Dakar to Abidjan with a single platform. Leave, time tracking, payroll and more.",
+    "cta": {
+      "try": "Try for free",
+      "demo": "Request demo"
+    },
+    "trust": {
+      "employees": "10,000+ employees managed",
+      "companies": "200+ companies",
+      "countries": "5 countries covered"
+    }
+  },
+  "benefits": {
+    "title": "Why choose our HRIS?",
+    "subtitle": "A solution designed for West Africa",
+    "multiCountry": {
+      "title": "Multi-country native",
+      "description": "Manage your teams in Senegal, Burkina Faso, Guinea, Ivory Coast and Benin from a single interface"
+    },
+    "localCurrency": {
+      "title": "Local currencies",
+      "description": "Native XOF and GNF support with local tax compliance"
+    },
+    "mobilFirst": {
+      "title": "Mobile-first",
+      "description": "Interface optimized for smartphones, even with slow connections"
+    },
+    "security": {
+      "title": "Security & Compliance",
+      "description": "RBAC/ABAC, encryption, data residency in Africa"
+    }
+  },
+  "personas": {
+    "title": "For every HR stakeholder",
+    "rh": {
+      "title": "HR Directors",
+      "description": "Unified dashboard, HR analytics, multi-entity management",
+      "features": ["Real-time dashboard", "Advanced reporting", "Policy management"]
+    },
+    "manager": {
+      "title": "Managers",
+      "description": "Quick approval, team tracking, simplified evaluations",
+      "features": ["Mobile approval", "Performance tracking", "Team planning"]
+    },
+    "payroll": {
+      "title": "Payroll Managers",
+      "description": "Automatic calculations, accounting exports, tax declarations",
+      "features": ["XOF/GNF calculations", "SAGE exports", "CNSS declarations"]
+    }
+  },
+  "howItWorks": {
+    "title": "How it works",
+    "step1": {
+      "title": "1. Sign up",
+      "description": "Create your account in 2 minutes, free trial without credit card"
+    },
+    "step2": {
+      "title": "2. Configure entities",
+      "description": "Define your countries, sites and local HR policies"
+    },
+    "step3": {
+      "title": "3. Invite your team",
+      "description": "Add your collaborators and start managing"
+    }
+  },
+  "pricing": {
+    "title": "Transparent pricing that adapts",
+    "subtitle": "Choose your plan according to your needs and size",
+    "employeeCount": "Number of employees",
+    "country": "Main country",
+    "billingCycle": {
+      "monthly": "Monthly", 
+      "annual": "Annual",
+      "save": "Save 15%"
+    },
+    "plans": {
+      "essential": {
+        "title": "Essential",
+        "description": "Perfect to get started",
+        "features": [
+          "Employee management",
+          "Leave and absences",
+          "HR documents",
+          "Basic workflows",
+          "Email support"
+        ],
+        "cta": "Get started"
+      },
+      "growth": {
+        "title": "Growth",
+        "description": "For expanding teams", 
+        "popular": "Most popular",
+        "features": [
+          "All Essential +",
+          "Time & Scheduling",
+          "Expense reports",
+          "Performance reviews",
+          "Standard integrations",
+          "Priority support"
+        ],
+        "cta": "Try for free"
+      },
+      "panafrica": {
+        "title": "Panafrica",
+        "description": "Advanced multi-country",
+        "features": [
+          "All Growth +",
+          "Multi-entity/country",
+          "Accounting exports",
+          "Public API",
+          "Advanced analytics", 
+          "Phone support"
+        ],
+        "cta": "Contact team"
+      },
+      "enterprise": {
+        "title": "Enterprise",
+        "description": "Custom solution",
+        "features": [
+          "All Panafrica +",
+          "On-site deployment",
+          "Private cloud",
+          "SSO/SCIM",
+          "99.9% SLA",
+          "Dedicated training",
+          "Account manager"
+        ],
+        "cta": "Contact Sales"
+      }
+    },
+    "addons": {
+      "title": "Add-on modules",
+      "mobileMoney": {
+        "title": "Mobile Money",
+        "description": "Orange Money, Wave, etc. payments"
+      },
+      "whatsapp": {
+        "title": "WhatsApp Bot",
+        "description": "WhatsApp notifications and interactions"
+      },
+      "ewa": {
+        "title": "Earned Wage Access (EWA)",
+        "description": "Salary advance for employees"
+      },
+      "sso": {
+        "title": "SSO/SCIM",
+        "description": "Enterprise single sign-on"
+      },
+      "hosting": {
+        "title": "Private hosting",
+        "description": "Dedicated cloud or on-premise"
+      },
+      "sla": {
+        "title": "SLA Gold",
+        "description": "99.9% uptime, 24/7 support"
+      }
+    },
+    "calculator": {
+      "basePrice": "Base price",
+      "perEmployee": "Per employee",
+      "addons": "Add-on modules",
+      "total": "Total",
+      "perMonth": "/month",
+      "perYear": "/year", 
+      "enterpriseNote": "For 100+ employees, contact our team for a personalized quote"
+    },
+    "faq": {
+      "title": "Frequently asked questions",
+      "q1": {
+        "question": "How does per-employee billing work?",
+        "answer": "You only pay for active employees. Add or remove anytime, billing adjusts automatically."
+      },
+      "q2": {
+        "question": "Can I manage multiple countries?",
+        "answer": "Yes, the Panafrica plan allows managing multiple entities in different countries with local compliance."
+      },
+      "q3": {
+        "question": "What currencies are supported?",
+        "answer": "XOF (Senegal, Burkina, Ivory Coast, Benin) and GNF (Guinea). USD display available for reference."
+      },
+      "q4": {
+        "question": "Is there a free trial?",
+        "answer": "Yes, 14 days free without credit card. Full access to features."
+      },
+      "q5": {
+        "question": "Can I change plans?",
+        "answer": "Yes, upgrade or downgrade anytime. Changes take effect immediately."
+      },
+      "q6": {
+        "question": "Is your data secure?",
+        "answer": "AES-256 encryption, hosting in Africa, GDPR compliance, regular security audits."
+      }
+    }
+  },
+  "enterprise": {
+    "title": "Enterprise: Custom solutions",
+    "subtitle": "For 100+ employee organizations with specific needs",
+    "benefits": {
+      "governance": {
+        "title": "Advanced governance",
+        "description": "Multi-BU, complex workflows, multi-level approvals"
+      },
+      "security": {
+        "title": "Enhanced security",
+        "description": "SSO/SCIM, audit trails, data residency"
+      },
+      "performance": {
+        "title": "Guaranteed performance",
+        "description": "99.9% SLA, dedicated support, proactive monitoring"
+      },
+      "integration": {
+        "title": "Custom integrations",
+        "description": "Private APIs, ERP/accounting connectors"
+      }
+    },
+    "deployments": {
+      "title": "Deployment options",
+      "kickstart": {
+        "title": "Kickstart (Remote)",
+        "duration": "2-4 weeks",
+        "description": "Accelerated setup with our experts",
+        "includes": ["Initial setup", "Team training", "Data migration", "30d support"]
+      },
+      "onsite": {
+        "title": "On-site",
+        "duration": "4-8 weeks",
+        "description": "Implementation at your premises",
+        "includes": ["Needs analysis", "On-site deployment", "User training", "90d support"]
+      },
+      "private": {
+        "title": "Private Cloud/On-prem",
+        "duration": "6-12 weeks",
+        "description": "Secure dedicated infrastructure",
+        "includes": ["Private infrastructure", "Complete migration", "Admin training", "12m support"]
+      }
+    },
+    "form": {
+      "title": "Enterprise qualification",
+      "company": "Company",
+      "email": "Business email",
+      "phone": "Phone",
+      "country": "Main country",
+      "employees": "Number of employees",
+      "entities": "Number of entities",
+      "timeline": "Desired timeline",
+      "requirements": "Specific requirements",
+      "sso": "Need SSO/SCIM?",
+      "hosting": "Hosting preference",
+      "submit": "Request quote"
+    }
+  },
+  "contact": {
+    "title": "Let's talk about your HR project",
+    "subtitle": "Our team supports you in your digital transformation",
+    "form": {
+      "name": "Full name",
+      "email": "Business email",
+      "company": "Company",
+      "phone": "Phone",
+      "country": "Country",
+      "employees": "Number of employees",
+      "role": "Your role", 
+      "message": "Your message",
+      "demo": "I want a demo",
+      "submit": "Send"
+    },
+    "info": {
+      "title": "Contact information",
+      "address": "Dakar, Senegal",
+      "email": "contact@sirh-panafrica.com",
+      "phone": "+221 XX XXX XX XX"
+    }
+  },
+  "compare": {
+    "title": "Detailed plan comparison",
+    "subtitle": "Find the perfect plan for your needs",
+    "modules": {
+      "coreHr": "Employee management",
+      "leaves": "Leave & Absences",
+      "timeTracking": "Time & Scheduling", 
+      "expenses": "Expense reports",
+      "payroll": "Payroll preparation",
+      "performance": "Performance reviews",
+      "documents": "DMS & Workflows",
+      "analytics": "Reporting & Analytics",
+      "api": "API & Integrations",
+      "support": "Support"
+    },
+    "included": "Included",
+    "addon": "Add-on module",
+    "enterpriseOnly": "Enterprise only"
+  },
+  "footer": {
+    "tagline": "SIRH Panafrica - The HR solution that grows with you",
+    "product": {
+      "title": "Product",
+      "pricing": "Pricing",
+      "features": "Features", 
+      "enterprise": "Enterprise",
+      "security": "Security"
+    },
+    "company": {
+      "title": "Company",
+      "about": "About",
+      "careers": "Careers",
+      "press": "Press",
+      "partners": "Partners"
+    },
+    "support": {
+      "title": "Support",
+      "help": "Help Center",
+      "contact": "Contact",
+      "status": "System Status",
+      "api": "API Documentation"
+    },
+    "legal": {
+      "title": "Legal",
+      "privacy": "Privacy",
+      "terms": "Terms",
+      "security": "Security",
+      "compliance": "Compliance"
+    },
+    "countries": "Available in Senegal, Burkina Faso, Guinea, Ivory Coast, Benin",
+    "currencies": "Billing in XOF and GNF - FR/EN interface"
+  },
+  "common": {
+    "learnMore": "Learn more",
+    "getStarted": "Get started",
+    "contactSales": "Contact team", 
+    "requestDemo": "Request demo",
+    "freeTrial": "Free trial",
+    "noCredit": "No credit card",
+    "popular": "Most popular",
+    "recommended": "Recommended", 
+    "coming": "Coming soon",
+    "perMonth": "/month",
+    "perYear": "/year",
+    "perEmployee": "/employee",
+    "startingAt": "Starting at",
+    "custom": "Custom quote",
+    "unlimited": "Unlimited"
+  }
+}

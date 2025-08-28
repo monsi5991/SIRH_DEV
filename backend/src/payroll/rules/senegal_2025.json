@@ -1,0 +1,44 @@
+{
+  "currency": "XOF",
+  "ceilings": {
+    "IPRES_GENERAL": 432000,
+    "IPRES_CADRE": 1296000,
+    "CSS_PF": 63000
+  },
+  "contribs": {
+    "IPRES_GENERAL": { "employee": 0.056, "employer": 0.084, "ceiling": "IPRES_GENERAL" },
+    "IPRES_CADRE":   { "employee": 0.024, "employer": 0.036, "ceiling": "IPRES_CADRE" },
+    "CSS_PF":        { "employee": 0.0,   "employer": 0.07,  "ceiling": "CSS_PF" }
+  },
+  "taxes": {
+    "CFCE": 0.03
+  },
+  "ir": {
+    "abatement": { "rate": 0.30, "cap": 900000 },
+    "scaleMonthly": [
+      { "upTo": 50000,  "rate": 0.00 },
+      { "upTo": 130000, "rate": 0.20 },
+      { "upTo": 333333, "rate": 0.30 },
+      { "upTo": null,   "rate": 0.40 }
+    ],
+    "rounding": { "unit": 1000, "mode": "floor" }
+  },
+  "trimfMonthly": [
+    { "min": 0,       "max": 599999,  "amount": 900 },
+    { "min": 600000,  "max": 999999,  "amount": 3600 },
+    { "min": 1000000, "max": 1999999, "amount": 4800 },
+    { "min": 2000000, "max": 6999999, "amount": 12000 },
+    { "min": 7000000, "max": 11999999,"amount": 18000 },
+    { "min": 12000000,"max": null,    "amount": 36000 }
+  ],
+  "overtime": {
+    "baseWeeklyHours": 40,
+    "types": {
+      "REG":      { "premium": 0.0 },
+      "OT_DAY":   { "premium": 0.15 },
+      "OT_NIGHT": { "premium": 0.40 },
+      "OT_SUN":   { "premium": 0.40 },
+      "OT_HOL":   { "premium": 0.40 }
+    }
+  }
+}

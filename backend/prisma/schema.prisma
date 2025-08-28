@@ -1,0 +1,678 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================
+// Core multi-tenant models
+// =============================
+model Tenant {
+  id       String  @id @default(cuid())
+  name     String
+  country  String?
+  city     String?
+  industry String?
+  size     String?
+
+  users       User[]
+  roles       Role[]
+  entities    Entity[]
+  permissions Permission[]
+
+  leaves        Leave[]
+  timesheets    Timesheet[]
+  expenses      Expense[]
+  events        Event[]
+  Employee      Employee[]
+  Document      Document[]
+  Activity      Activity[]
+  ReviewCycle   ReviewCycle[]
+  Goal          Goal[]
+  Course        Course[]
+  Session       Session[]
+  Enrollment    Enrollment[]
+  Certification Certification[]
+
+  // NEW modules
+  OnboardingCase       OnboardingCase[]
+  OffboardingCase      OffboardingCase[]
+  ComplianceTask       ComplianceTask[]
+  ComplianceObligation ComplianceObligation[]
+  ComplianceChecklist  ComplianceChecklist[]
+  Policy               Policy[]
+  PolicyVersion        PolicyVersion[]
+  PolicyAck            PolicyAck[]
+  AuditEvent           AuditEvent[]
+
+  // Payroll
+  PayRun   PayRun[]
+  Payslip  Payslip[]
+}
+
+model Entity {
+  id       String @id @default(cuid())
+  name     String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  tenantId String
+  users    User[]
+
+  @@unique([tenantId, name], name: "tenantId_name")
+}
+
+model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  passwordHash  String
+  firstName     String
+  lastName      String
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  tenantId      String
+  entity        Entity?        @relation(fields: [entityId], references: [id])
+  entityId      String?
+  roles         UserRole[]
+  refreshTokens RefreshToken[]
+  createdAt     DateTime       @default(now())
+
+  // 🔧 back-relation 1:1 vers Employee
+  employee Employee? @relation(name: "UserEmployee")
+
+  @@index([tenantId])
+}
+
+model Role {
+  id              String           @id @default(cuid())
+  name            String
+  tenant          Tenant           @relation(fields: [tenantId], references: [id])
+  tenantId        String
+  rolePermissions RolePermission[]
+  users           UserRole[]
+
+  @@unique([name, tenantId], name: "name_tenantId")
+}
+
+model Permission {
+  id              String           @id @default(cuid())
+  name            String
+  tenant          Tenant           @relation(fields: [tenantId], references: [id])
+  tenantId        String
+  rolePermissions RolePermission[]
+
+  @@unique([name, tenantId], name: "name_tenantId")
+}
+
+model UserRole {
+  userId String
+  roleId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  tokenHash String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// =============================
+// Demo ops modules
+// =============================
+model Leave {
+  id         String   @id @default(cuid())
+  employee   String
+  employeeId String?  // 🔹 FK logique vers Employee (stockage souple)
+  start      DateTime
+  end        DateTime
+  type       String   @default("CP")    // 🔹 CP / Maladie / SansSolde / etc.
+  paid       Boolean  @default(true)    // 🔹 impact paie (retenue si false)
+  halfDay    String?                    // 🔹 'AM' | 'PM' | null
+  status     String   @default("Pending")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  tenantId String
+
+  @@index([tenantId])
+  @@index([tenantId, employeeId, start, end])
+}
+
+model Timesheet {
+  id         String   @id @default(cuid())
+  employee   String
+  employeeId String?  // 🔹 FK logique vers Employee
+  date       DateTime
+  hours      Float
+  project    String?
+  note       String?
+  createdAt  DateTime @default(now())
+
+  status     String    @default("Submitted")
+  approvedBy String?
+  approvedAt DateTime?
+
+  // 🔹 typage des heures (paie)
+  type       String    @default("REG") // REG | OT_DAY | OT_NIGHT | OT_SUN | OT_HOL
+  premium    Float?                     // override de la majoration si besoin
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  tenantId String
+
+  @@index([tenantId, date])
+  @@index([status])
+  @@index([tenantId, employeeId, date])
+
+  // 🚫 Un employé ne peut pas avoir deux entrées le même jour dans un tenant
+  @@unique([tenantId, employee, date], name: "uniq_timesheet_per_day")
+  @@unique([tenantId, employeeId, date], name: "uniq_timesheet_empid")
+}
+
+model Expense {
+  id           String   @id @default(cuid())
+  employee     String
+  employeeId   String?  // 🔹 FK logique vers Employee
+  date         DateTime
+  category     String
+  amount       Int
+  currency     String   @default("XOF")
+  taxTreatment String   @default("REIMBURSEMENT") // 🔹 REIMBURSEMENT | BENEFIT_TAXABLE | PER_DIEM_EXEMPT
+  status       String   @default("Submitted")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  tenantId String
+
+  @@index([tenantId, date])
+  @@index([tenantId, employeeId, date])
+}
+
+model Event {
+  id        String   @id @default(cuid())
+  title     String
+  date      DateTime
+  time      String?
+  type      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  description String?
+  location    String?
+  attendees   Json?
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  tenantId String
+
+  @@index([tenantId, date])
+  @@index([type])
+}
+
+// =============================
+// PEOPLE / CORE RH
+// =============================
+enum EmployeeStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ContractType {
+  CDI
+  CDD
+  STAGE
+  INTERIM
+  APPRENTISSAGE
+}
+
+model Employee {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  firstName     String
+  lastName      String
+  email         String  @unique
+  phone         String?
+  phoneWhatsApp String?
+
+  country      String         @default("SN")
+  department   String?
+  site         String?
+  position     String?
+  status       EmployeeStatus @default(ACTIVE)
+  joinDate     DateTime?
+  endDate      DateTime?
+  contractType ContractType?
+
+  // ➕ Salaire de base (prod/pilote)
+  baseSalary Int? // XOF
+
+  // 🔧 clé étrangère + relation vers User
+  userId String? @unique
+  user   User?   @relation(name: "UserEmployee", fields: [userId], references: [id], onDelete: SetNull)
+
+  // Conformité Sénégal
+  cnss  String?
+  ipres String?
+
+  // 🔹 Profil paie (ajouts)
+  cadre            Boolean @default(false)  // régime cadre IPRES
+  atRate           Float   @default(0.03)   // 0.01 | 0.03 | 0.05 (CSS AT)
+  familyParts      Int     @default(0)      // parts fiscales éventuelles
+  transportTaxable Boolean @default(true)   // prime transport imposable ?
+  benefits         Json?                    // { housing?: number, car?: number, ... }
+  bankName         String?
+  bankIban         String?
+  ipmRate          Float?                   // mutuelle employé (%), si utilisé
+
+  managerId String?
+  manager   Employee?  @relation("EmployeeManager", fields: [managerId], references: [id])
+  reports   Employee[] @relation("EmployeeManager")
+
+  documents      Document[]
+  activities     Activity[]
+  goals          Goal[]
+  certifications Certification[]
+
+  onboardingCases  OnboardingCase[]
+  offboardingCases OffboardingCase[]
+
+  complianceTasks ComplianceTask[]
+  policyAcks      PolicyAck[]
+
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  Enrollment Enrollment[]
+
+  // Payroll
+  Payslip   Payslip[]
+
+  @@index([tenantId, country, department, site, status])
+  @@index([lastName, firstName])
+}
+
+model Document {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id])
+
+  label     String
+  type      String?
+  url       String
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([tenantId, employeeId])
+  @@index([expiresAt])
+}
+
+model Activity {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id])
+
+  title String
+  when  DateTime @default(now())
+
+  @@index([tenantId, employeeId, when])
+}
+
+// Performance (lite)
+model ReviewCycle {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  name      String
+  period    String
+  startDate DateTime
+  endDate   DateTime
+
+  goals     Goal[]
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, period])
+}
+
+model Goal {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id])
+
+  cycleId String?
+  cycle   ReviewCycle? @relation(fields: [cycleId], references: [id])
+
+  title     String
+  status    String    @default("on_track")
+  progress  Int       @default(0)
+  startDate DateTime?
+  endDate   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, employeeId])
+}
+
+// Formation
+model Course {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  title     String
+  mandatory Boolean @default(false)
+
+  createdAt DateTime  @default(now())
+  sessions  Session[]
+
+  @@index([tenantId, title])
+}
+
+model Session {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  courseId String
+  course   Course @relation(fields: [courseId], references: [id])
+
+  startDate DateTime
+  endDate   DateTime
+  location  String?
+  capacity  Int?
+
+  enrollments Enrollment[]
+
+  @@index([tenantId, courseId, startDate])
+}
+
+model Enrollment {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id])
+
+  sessionId String
+  session   Session @relation(fields: [sessionId], references: [id])
+
+  status String @default("enrolled")
+  score  Int?
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, employeeId, sessionId])
+}
+
+model Certification {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id])
+
+  name      String
+  issuedAt  DateTime
+  expiresAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, employeeId])
+  @@index([expiresAt])
+}
+
+// =============================
+// Workflows / Compliance / Policy
+// =============================
+model OnboardingCase {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  employeeId   String?
+  employee     Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  employeeName String
+
+  status    String   @default("draft")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, status])
+  @@index([tenantId, employeeId])
+}
+
+model OffboardingCase {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  employeeId   String?
+  employee     Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  employeeName String
+
+  status    String   @default("draft")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, status])
+  @@index([tenantId, employeeId])
+}
+
+enum ComplianceTaskStatus {
+  TODO
+  DOING
+  DONE
+  EXPIRED
+}
+
+model ComplianceTask {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  employeeId String?
+  employee   Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+
+  obligationId String?
+  obligation   ComplianceObligation? @relation(fields: [obligationId], references: [id], onDelete: SetNull)
+
+  label       String
+  category    String
+  dueAt       DateTime?
+  status      ComplianceTaskStatus @default(TODO)
+  notes       String?
+  evidenceUrl String?
+  completedAt DateTime?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@index([tenantId, status])
+  @@index([tenantId, category])
+  @@index([tenantId, employeeId])
+}
+
+model ComplianceObligation {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  key            String
+  label          String
+  period         String?
+  isActive       Boolean          @default(true)
+  createdAt      DateTime         @default(now())
+  ComplianceTask ComplianceTask[]
+
+  @@unique([tenantId, key])
+  @@index([tenantId, period])
+}
+
+model ComplianceChecklist {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  code      String
+  title     String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  items ComplianceChecklistItem[]
+
+  @@unique([tenantId, code], name: "tenantId_code")
+}
+
+model ComplianceChecklistItem {
+  id          String              @id @default(cuid())
+  checklistId String
+  checklist   ComplianceChecklist @relation(fields: [checklistId], references: [id])
+
+  label      String
+  category   String
+  daysOffset Int?
+  orderNo    Int    @default(0)
+}
+
+model Policy {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  title    String
+  category String?
+  isActive Boolean @default(true)
+
+  versions PolicyVersion[]
+  acks     PolicyAck[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, title])
+  @@index([tenantId, category])
+}
+
+model PolicyVersion {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  policyId String
+  policy   Policy @relation(fields: [policyId], references: [id])
+
+  version     Int
+  language    String    @default("FR")
+  content     String?
+  fileUrl     String?
+  effectiveAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@unique([tenantId, policyId, version])
+  @@index([tenantId, policyId])
+}
+
+enum PolicyAckMethod {
+  read
+  check
+  otp
+}
+
+model PolicyAck {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  policyId String
+  policy   Policy @relation(fields: [policyId], references: [id])
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  method         PolicyAckMethod
+  acknowledgedAt DateTime?
+  createdAt      DateTime        @default(now())
+
+  @@unique([policyId, employeeId], name: "policyId_employeeId")
+  @@index([tenantId, policyId])
+  @@index([tenantId, employeeId])
+}
+
+model AuditEvent {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  actorId   String?
+  type      String
+  entity    String
+  entityId  String
+  payload   Json?
+  ip        String?
+  ua        String?
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, type, createdAt])
+}
+
+// =============================
+// PAYROLL (ajouté)
+// =============================
+model PayRun {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  period    String   // YYYY-MM
+  status    String   @default("draft") // draft | finalized | paid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  slips Payslip[]
+
+  @@unique([tenantId, period])
+}
+
+model Payslip {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  payRunId    String
+  payRun      PayRun   @relation(fields: [payRunId], references: [id], onDelete: Cascade)
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  period      String
+  lines       Json
+  totals      Json
+  fileUrl     String?
+  createdAt   DateTime @default(now())
+
+  @@unique([tenantId, period, employeeId])
+}
