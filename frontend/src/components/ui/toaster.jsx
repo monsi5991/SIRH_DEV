@@ -1,63 +1,113 @@
 // src/components/ui/toaster.jsx
-import React from "react";
+import * as React from "react";
+import {
+  ToastProvider as RadixProvider,
+  ToastViewport,
+  Toast,
+  ToastTitle,
+  ToastDescription,
+  ToastClose,
+} from "./toast";
+import { ToastProvider as AppToastProvider, useToast, _subscribeToasts } from "./use-toast";
 import PropTypes from "prop-types";
-import { Toaster as SonnerToaster } from "sonner";
 
 /**
- * Props:
- * - theme: "light" | "dark" | "system" (par défaut "system")
- * - ...props : toute prop supportée par sonner
- *
- * Détection "system" via matchMedia si aucune prop theme fournie.
+ * <BridgeSubscriber />
+ * Écoute l’événement global "app:toast" (helper toast()) et pousse dans le contexte.
+ */
+function BridgeSubscriber() {
+  const { toast } = useToast();
+  React.useEffect(() => {
+    const unsub = _subscribeToasts((opts) => toast(opts));
+    return () => unsub?.();
+  }, [toast]);
+  return null;
+}
+
+/**
+ * Mappe une position style sonner vers des classes shadcn (viewport).
+ */
+function viewportPositionClass(position) {
+  switch (position) {
+    case "top-right":
+      return "fixed top-0 right-0 flex max-h-screen w-full flex-col p-4 md:max-w-[420px] gap-2 z-[100]";
+    case "top-left":
+      return "fixed top-0 left-0 flex max-h-screen w-full flex-col p-4 md:max-w-[420px] gap-2 z-[100]";
+    case "bottom-right":
+      return "fixed bottom-0 right-0 flex max-h-screen w-full flex-col p-4 md:max-w-[420px] gap-2 z-[100]";
+    case "bottom-left":
+      return "fixed bottom-0 left-0 flex max-h-screen w-full flex-col p-4 md:max-w-[420px] gap-2 z-[100]";
+    case "top-center":
+      return "fixed top-0 left-1/2 -translate-x-1/2 flex max-h-screen w-full max-w-[640px] flex-col p-4 gap-2 z-[100]";
+    case "bottom-center":
+      return "fixed bottom-0 left-1/2 -translate-x-1/2 flex max-h-screen w-full max-w-[640px] flex-col p-4 gap-2 z-[100]";
+    default:
+      return "fixed top-0 right-0 flex max-h-screen w-full flex-col p-4 md:max-w-[420px] gap-2 z-[100]";
+  }
+}
+
+function ToastList({ closeButton, position }) {
+  const { toasts, remove } = useToast();
+
+  return (
+    <>
+      {toasts.map((t) => (
+        <Toast
+          key={t.id}
+          // onOpenChange est déclenché quand l’utilisateur ferme le toast (clic/gesture).
+          onOpenChange={(open) => {
+            if (!open) remove(t.id);
+          }}
+          // data-variant pour tes styles conditionnels Tailwind/CSS si besoin
+          data-variant={t.variant ?? "default"}
+          className="group"
+        >
+          {t.title && <ToastTitle>{t.title}</ToastTitle>}
+          {t.description && <ToastDescription>{t.description}</ToastDescription>}
+          {closeButton !== false && <ToastClose />}
+        </Toast>
+      ))}
+      {/* Positionnement du viewport */}
+      <ToastViewport className={viewportPositionClass(position)} />
+    </>
+  );
+}
+
+/**
+ * Toaster
+ * Props similaires à ton ancien composant:
+ * - theme: "light" | "dark" | "system" (utilisé comme data-theme pour tes styles)
+ * - position: "top-right" | "top-left" | "bottom-right" | "bottom-left" | "top-center" | "bottom-center"
+ * - swipeDirection: "right" | "left" | "up" | "down" (Radix)
+ * - closeButton: bool (afficher le bouton de fermeture)
+ * - defaultDuration: durée par défaut pour Radix (les auto-dismiss viennent déjà du provider custom)
  */
 export function Toaster({
   theme = "system",
   position = "top-right",
-  expand = true,
-  richColors = true,
+  swipeDirection = "right",
   closeButton = true,
-  ...props
+  defaultDuration = 3200,
 }) {
-  // Détecte le thème système si "system"
+  // Résolution du thème system -> data-theme (tes styles peuvent cibler [data-theme="dark"])
   const resolvedTheme =
     theme === "system"
       ? (typeof window !== "undefined" &&
-         window.matchMedia &&
-         window.matchMedia("(prefers-color-scheme: dark)").matches
-        ? "dark"
-        : "light")
+         window.matchMedia?.("(prefers-color-scheme: dark)")?.matches
+          ? "dark"
+          : "light")
       : theme;
 
   return (
-    <SonnerToaster
-      theme={resolvedTheme}
-      richColors={richColors}
-      closeButton={closeButton}
-      position={position}
-      expand={expand}
-      className="toaster group"
-      toastOptions={{
-        classNames: {
-          toast:
-            "group toast group-[.toaster]:bg-background group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-lg",
-          description: "group-[.toast]:text-muted-foreground",
-          actionButton:
-            "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground",
-          cancelButton:
-            "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
-        },
-      }}
-      {...props}
-    />
+    <AppToastProvider>
+      <div data-theme={resolvedTheme}>
+        <RadixProvider swipeDirection={swipeDirection} duration={defaultDuration}>
+          <BridgeSubscriber />
+          <ToastList closeButton={closeButton} position={position} />
+        </RadixProvider>
+      </div>
+    </AppToastProvider>
   );
 }
-
-Toaster.propTypes = {
-  theme: PropTypes.oneOf(["light", "dark", "system"]),
-  position: PropTypes.string,
-  expand: PropTypes.bool,
-  richColors: PropTypes.bool,
-  closeButton: PropTypes.bool,
-};
 
 export default Toaster;

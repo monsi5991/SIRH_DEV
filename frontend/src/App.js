@@ -27,7 +27,7 @@ import ExpensesPage from "./pages/operations/ExpensesPage";
 // RH / People
 import AnnuairePage from "./pages/people/AnnuairePage";
 import PerformancePage from "./pages/people/PerformancePage";
-import PerformanceDetailPage from "./pages/people/PerformanceDetailPage"; // ✅ AJOUT
+import PerformanceDetailPage from "./pages/people/PerformanceDetailPage";
 import FormationPage from "./pages/people/FormationPage";
 
 // Documents
@@ -38,14 +38,14 @@ import OffboardingPage from "./pages/documents/OffboardingPage";
 import CompliancePage from "./pages/resources/CompliancePage";
 import PoliciesPage from "./pages/resources/PoliciesPage";
 
-// ✅ Paie (admin)
-import PreparationPayrollPage from "./pages/payroll/PreparationPage";
-import PayslipsPage from "./pages/payroll/PayslipsPage";
+// ❌ SUPPRIMÉ: toute la paie (pages/admin/portail salarié)
+// import PreparationPayrollPage from "./pages/payroll/PreparationPage";
+// import PayslipsPage from "./pages/payroll/PayslipsPage";
+// import PayrollParamsPage from "./pages/payroll/PayrollParamsPage";
+// import PayslipHtmlPage from "./pages/payroll/PayslipHtmlPage";
+// import MyPayslipsPage from "./pages/employee/MyPayslipsPage";
 
-// ✅ Portail salarié
-import MyPayslipsPage from "./pages/employee/MyPayslipsPage";
-
-// ✅ RH (optionnel) : gestion employés
+// RH (optionnel) : gestion employés
 import EmployeeListPage from "./pages/employee/EmployeeListPage";
 import EmployeeEditPage from "./pages/employee/EmployeeEditPage";
 
@@ -174,7 +174,6 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
-      {/* ✅ Détail performance */}
       <Route
         path="/people/performance/:id"
         element={
@@ -252,47 +251,9 @@ function AppRoutes() {
         }
       />
 
-      {/* ✅ Paie (admin) */}
-      <Route
-        path="/payroll/preparation"
-        element={
-          <ProtectedRoute>
-            {({ user }) => (
-              <Layout user={user}>
-                <PreparationPayrollPage />
-              </Layout>
-            )}
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/payroll/payslips"
-        element={
-          <ProtectedRoute>
-            {({ user }) => (
-              <Layout user={user}>
-                <PayslipsPage />
-              </Layout>
-            )}
-          </ProtectedRoute>
-        }
-      />
+      {/* ❌ SUPPRIMÉ: toutes les routes /payroll/* et /me/payslips */}
 
-      {/* ✅ Portail salarié */}
-      <Route
-        path="/me/payslips"
-        element={
-          <ProtectedRoute>
-            {({ user }) => (
-              <Layout user={user}>
-                <MyPayslipsPage />
-              </Layout>
-            )}
-          </ProtectedRoute>
-        }
-      />
-
-      {/* ✅ RH (optionnel) : gestion employés */}
+      {/* RH (optionnel) : gestion employés */}
       <Route
         path="/employee"
         element={
@@ -341,6 +302,18 @@ function AppRoutes() {
 }
 
 export default function App() {
+  // ✅ Redirection automatique si 401 après tentative de refresh
+  React.useEffect(() => {
+    const on401 = () => {
+      try { localStorage.removeItem("sirh_access"); } catch { /* noop */ }
+      if (window.location.pathname !== "/login") {
+        window.location.replace("/login");
+      }
+    };
+    window.addEventListener("auth:unauthorized", on401);
+    return () => window.removeEventListener("auth:unauthorized", on401);
+  }, []);
+
   return (
     <AuthProvider>
       <AppProvider>

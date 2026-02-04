@@ -1,3 +1,4 @@
+// prisma/seed.js
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
@@ -349,7 +350,7 @@ async function main() {
   }
 
   // =======================
-  //   >>> DÉMO OPÉRATIONS (Timesheets / Expenses / Leaves) – compatibles paie
+  //   >>> DÉMO OPÉRATIONS
   // =======================
   const { from, to } = currentPeriodYM();
 
@@ -365,20 +366,24 @@ async function main() {
     await prisma.leave.deleteMany({
       where: {
         tenantId: tenant.id,
-        OR: [{ employee: { contains: empName } }, { employeeId: e.id }],
-        OR: [
-          { start: { gte: from, lt: to } },
-          { end:   { gt: from,  lte: to } },
-          { AND: [{ start: { lt: to } }, { end: { gt: from } }] }
+        AND: [
+          { OR: [{ employee: { contains: empName } }, { employeeId: e.id }] },
+          {
+            OR: [
+              { start: { gte: from, lt: to } },
+              { end:   { gt: from,  lte: to } },
+              { AND: [{ start: { lt: to } }, { end: { gt: from } }] } // chevauchement
+            ]
+          }
         ]
       }
     });
   }
 
-  // 1) Awa : 12 jours, HS typées, 1 jour sans solde, 1 dépense approuvée
+  // 1) Awa : jours + HS + 1 sans solde + 1 remboursement
   if (awa) {
     const awaName = `${awa.firstName} ${awa.lastName}`;
-    const workDays = [1,2,3,4,5,8,9,10,11,12,15,16]; // 12 jours
+    const workDays = [1,2,3,4,5,8,9,10,11,12,15,16];
     for (const [idx, d] of workDays.entries()) {
       const status = idx % 3 === 0 ? "Approved" : "Submitted";
       await prisma.timesheet.create({
@@ -423,7 +428,7 @@ async function main() {
     });
   }
 
-  // 2) Mamadou : 7 jours Submitted + CP en attente
+  // 2) Mamadou : 7 jours + CP en attente
   if (mamadou) {
     const mName = `${mamadou.firstName} ${mamadou.lastName}`;
     const workDays = [1,2,3,4,5,8,9];
@@ -455,7 +460,7 @@ async function main() {
     });
   }
 
-  // 3) Fatou : 1 dépense approuvée, CP rejeté
+  // 3) Fatou : 1 remboursement + CP rejeté
   if (fatou) {
     const fatName = `${fatou.firstName} ${fatou.lastName}`;
     await prisma.expense.create({
@@ -497,7 +502,7 @@ async function main() {
     }
   });
 
-  // Backfill : lier userId s'il manque encore
+  // Backfill : lier userId s'il manque
   const usersAll = await prisma.user.findMany({ where: { tenantId: tenant.id } });
   for (const u of usersAll) {
     const emp = await prisma.employee.findFirst({ where: { tenantId: u.tenantId, email: u.email } });
@@ -506,7 +511,7 @@ async function main() {
     }
   }
 
-  console.log("✅ Seed terminé (profil paie + ops compatibles paie SN).");
+  console.log("✅ Seed terminé.");
 }
 
 try {

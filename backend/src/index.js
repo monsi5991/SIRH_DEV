@@ -45,12 +45,13 @@ import documentsRouter   from "./routes/documents.js";
 import complianceRouter  from "./routes/resources/compliance.js";
 import policiesRouter    from "./routes/resources/policies.js";
 
-// Paie
-import payrollRouter     from "./routes/payroll.js";
 
 import peopleCountersRouter from "./routes/peopleCounters.js";
 
 const app = express();
+
+// ✅ si derrière un proxy (nginx/Heroku/Render…), on lit X-Forwarded-*
+app.set("trust proxy", true);
 
 app.use(cors({
   origin: ["http://localhost:5173", "http://localhost:3000"],
@@ -59,11 +60,14 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 
-// fichiers uploadés (documents RH, bulletins, etc.)
-app.use("/uploads", express.static(path.resolve("uploads")));
+// ✅ fichiers uploadés (documents RH, etc.) avec URLs stables et cache
+app.use("/uploads", express.static(path.resolve("uploads"), {
+  fallthrough: false,
+  etag: true,
+  maxAge: "1h",
+}));
 
 app.use("/people/counters", peopleCountersRouter);
-
 
 // Healthcheck
 app.get("/", (_req, res) => res.json({ ok: true }));
@@ -234,7 +238,6 @@ app.get("/me", verifyAccess, async (req, res) => {
 /** Routes PROTÉGÉES (JWT requis ici) */
 app.use("/resources/compliance", verifyAccess, complianceRouter);
 app.use("/resources/policies",  verifyAccess, policiesRouter);
-app.use("/payroll",   verifyAccess, payrollRouter);
 app.use("/people",    verifyAccess, peopleRouter);
 app.use("/employees", verifyAccess, employeesRouter); // ✅ aligne le frontend (/employees, /employees/:id)
 app.use("/performance", verifyAccess, performanceRouter);

@@ -20,8 +20,11 @@ export default function EmployeeEditPage() {
     setLoading(true);
     setNotFound(false);
     try {
-      const data = await get(`/people/employees/${id}`)   // <- route people/employees (backend corrigé)
-        .catch(async () => await get(`/employees/${id}`)); // <- fallback si ancien endpoint
+      // 🔎 tente la nouvelle route unifiée, sinon fallback sur l’ancienne
+      const data =
+        (await get(`/people/employees/${id}`)) ??
+        (await get(`/employees/${id}`));
+
       if (!data || !data.id) {
         setNotFound(true);
         setEmp(null);
@@ -51,11 +54,13 @@ export default function EmployeeEditPage() {
     if (!id) return;
     setSaving(true);
     try {
-      // même logique “nouvelle route + fallback”
+      // 🧩 PATCH via la nouvelle route; fallback si backend ancien
       await patch(`/people/employees/${id}`, payload).catch(async () => {
         await patch(`/employees/${id}`, payload);
       });
+
       toast.success("Employé mis à jour");
+      // notifier les autres écrans (liste, etc.)
       window.dispatchEvent(new Event("employees:changed"));
       navigate(-1);
     } catch (e) {
@@ -65,7 +70,7 @@ export default function EmployeeEditPage() {
     }
   };
 
-  // — Rendus sûrs (ne jamais accéder à emp.firstName sans null-check) —
+  // — Rendus sûrs —
   if (loading) {
     return (
       <div className="p-6 text-sm text-gray-500">
@@ -104,6 +109,8 @@ export default function EmployeeEditPage() {
         </CardHeader>
 
         <CardContent>
+          {/* EmployeeForm doit accepter initialData et onSubmit.
+             Il peut aussi accepter un prop "loading" pour désactiver le bouton si nécessaire. */}
           <EmployeeForm initialData={emp} onSubmit={onSubmit} loading={saving} />
         </CardContent>
       </Card>

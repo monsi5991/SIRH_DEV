@@ -1,12 +1,6 @@
 // src/hooks/useEmployees.js
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  fetchEmployees as apiFetchEmployees,
-  fetchEmployee as apiFetchEmployee,
-  createEmployee as apiCreateEmployee,
-  updateEmployee as apiUpdateEmployee,
-  uploadEmployeeDocument as apiUploadEmployeeDocument,
-} from "../lib/peopleApi";
+import { get, post, patch as httpPatch } from "../lib/api";
 
 /** Petit util debounce contrôlé */
 export function useDebouncedValue(value, delay = 300) {
@@ -29,7 +23,8 @@ function normalizeList(res) {
 
 /**
  * Liste paginée d’employés
- * params: { q, country, department, site, status, page, pageSize }
+ * params: { q, search, country, department, site, status, page, pageSize }
+ * -> essaie /people/employees puis fallback /employees
  */
 export function useEmployees(params) {
   const [items, setItems] = useState([]);
@@ -51,7 +46,7 @@ export function useEmployees(params) {
       pageSize = 12,
     } = params || {};
     const query = (q ?? search ?? "").trim();
-    return { q: query, country, department, site, status, page, pageSize };
+    return { q: query, search: query, country, department, site, status, page, pageSize };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     params?.search,
@@ -74,9 +69,26 @@ export function useEmployees(params) {
     setError("");
 
     try {
-      const res = await apiFetchEmployees(stableParams, { signal: controller.signal });
-      const { items, total } = normalizeList(res);
-      setItems(items);
+      const qs = new URLSearchParams({
+        // on envoie à la fois search et q pour couvrir les 2 versions backend
+        search: stableParams.search || "",
+        q: stableParams.q || "",
+        country: stableParams.country || "",
+        department: stableParams.department || "",
+        site: stableParams.site || "",
+        status: stableParams.status || "",
+        page: String(stableParams.page || 1),
+        pageSize: String(stableParams.pageSize || 12),
+      }).toString();
+
+      // ✅ nouvelle route
+      let res = await get(`/people/employees?${qs}`, { signal: controller.signal }).catch(async () => {
+        // ⬇️ fallback ancienne route
+        return await get(`/employees?${qs}`, { signal: controller.signal });
+      });
+
+      const { items: list, total } = normalizeList(res);
+      setItems(list);
       setTotal(total);
     } catch (e) {
       if (controller.signal.aborted) return;
@@ -100,6 +112,7 @@ export function useEmployees(params) {
 
 /**
  * Détail employé
+ * -> essaie /people/employees/:id puis fallback /employees/:id
  */
 export function useEmployeeDetail(employeeId) {
   const [employee, setEmployee] = useState(null);
@@ -117,7 +130,12 @@ export function useEmployeeDetail(employeeId) {
     setError("");
 
     try {
-      const res = await apiFetchEmployee(employeeId, { signal: controller.signal });
+      // ✅ nouvelle route
+      let res = await get(`/people/employees/${employeeId}`, { signal: controller.signal }).catch(async () => {
+        // ⬇️ fallback ancienne route
+        return await get(`/employees/${employeeId}`, { signal: controller.signal });
+      });
+
       setEmployee(res || null);
     } catch (e) {
       if (controller.signal.aborted) return;
@@ -136,8 +154,59 @@ export function useEmployeeDetail(employeeId) {
   return { employee, loading, error, refetch, setEmployee };
 }
 
-// Pass-through utilitaires (pour réutiliser dans tes pages)
-export const createEmployee = (body) => apiCreateEmployee(body);
-export const updateEmployee = (id, body) => apiUpdateEmployee(id, body);
-export const uploadEmployeeDocument = (employeeId, payload) =>
-  apiUploadEmployeeDocument(employeeId, payload);
+/* =========================================================
+ * Pass-through utilitaires (création / update / upload)
+ * -> ciblent d’abord /people/* puis fallback
+ * ========================================================= */
+
+export async function createEmployee(body) {
+  try {
+    return await post("/people/employees", body);
+  } catch (_) {
+    // fallback legacy
+    return await post("/employees", body);
+  }
+}
+
+export async function updateEmployee(id, body) {
+  try {
+    return await httpPatch(`/people/employees/${id}`, body);
+  } catch (_) {
+    // fallback legacy
+    return await httpPatch(`/employees/${id}`, body);
+  }
+}
+
+export async function uploadEmployeeDocument(employeeId, payload) {
+  const { file, label, type = "autre", expiresAt } = payload || {};
+  const fd = new FormData();
+  if (file) fd.append("file", file);
+  if (label) fd.append("label", label);
+  if (type) fd.append("type", type);
+  if (expiresAt) fd.append("expiresAt", expiresAt);
+
+  // On utilise fetch brut ici, car on doit envoyer FormData
+  const baseUrl = import.meta.env?.VITE_API_URL || "http://localhost:4000";
+
+  // Essai nouvelle route
+  let res = await fetch(`${baseUrl}/people/employees/${employeeId}/documents`, {
+    method: "POST",
+    body: fd,
+    headers: {}, // laisser vide pour que le boundary FormData soit géré
+  });
+
+  if (!res.ok) {
+    // Fallback legacy
+    res = await fetch(`${baseUrl}/employees/${employeeId}/documents`, {
+      method: "POST",
+      body: fd,
+      headers: {},
+    });
+  }
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data?.error || data?.message || "upload_failed");
+  }
+  return data?.document || data;
+}

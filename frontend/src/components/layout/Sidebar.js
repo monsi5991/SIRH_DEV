@@ -4,7 +4,7 @@ import PropTypes from 'prop-types';
 import { get } from '../../lib/api';
 import { useApp } from '../../contexts/AppContext';
 import {
-  Home, Users, Clock, Receipt,
+  Home, Users, Clock,
   FileText, BookOpen, BarChart3, Settings,
   ChevronDown, ChevronRight, Lock, Crown, User
 } from 'lucide-react';
@@ -39,7 +39,7 @@ const navigationItems = [
   { key: 'home', icon: Home, path: '/', feature: null, children: [] },
   {
     key: 'myspace', icon: User, path: null, feature: null, children: [
-      { key: 'myPayslips', path: '/me/payslips', feature: null },
+      // Partie paie supprimée: { key: 'myPayslips', path: '/me/payslips', feature: null },
     ]
   },
   {
@@ -50,12 +50,13 @@ const navigationItems = [
       { key: 'expenses',      path: '/operations/expenses',  feature: 'expenses' }
     ]
   },
-  {
-    key: 'payroll', icon: Receipt, path: null, feature: 'payroll', plan: 'panafrica', children: [
-      { key: 'payPrep',  path: '/payroll/preparation', feature: 'payPrep' },
-      { key: 'payslips', path: '/payroll/payslips',    feature: 'payslips' }
-    ]
-  },
+  // Section paie supprimée:
+  // {
+  //   key: 'payroll', icon: Receipt, path: null, feature: 'payroll', plan: 'panafrica', children: [
+  //     { key: 'payPrep',  path: '/payroll/preparation', feature: 'payPrep' },
+  //     { key: 'payslips', path: '/payroll/payslips',    feature: 'payslips' }
+  //   ]
+  // },
   {
     key: 'documents', icon: FileText, path: null, feature: null, children: [
       { key: 'onboarding',  path: '/documents/onboarding',  feature: 'onboarding' },
@@ -100,9 +101,10 @@ const isFeatureLocked = (feature, user) => {
     .filter(Boolean);
   const has = (name) => roles.includes(name) || user?.role === name;
 
-  if (feature === 'payroll' || feature === 'payPrep' || feature === 'payslips') {
-    return !(has('Admin') || has('RH'));
-  }
+  // Règles paie supprimées
+  // if (feature === 'payroll' || feature === 'payPrep' || feature === 'payslips') {
+  //   return !(has('Admin') || has('RH'));
+  // }
   if (feature === 'advancedAnalytics') {
     return !has('Admin');
   }
@@ -112,7 +114,7 @@ const isFeatureLocked = (feature, user) => {
 const labelOverride = {
   home: 'Tableau de bord',
   myspace: 'Mon espace',
-  myPayslips: 'Mes bulletins',
+  // myPayslips: 'Mes bulletins', // supprimé
   operations: 'Opérations',
   people: 'RH / People',
   documents: 'Documents',
@@ -126,9 +128,9 @@ const labelOverride = {
   directory: 'Annuaire',
   performance: 'Performance',
   training: 'Formation',
-  payroll: 'Paie',
-  payPrep: 'Préparation paie',
-  payslips: 'Bulletins',
+  // payroll: 'Paie',        // supprimé
+  // payPrep: 'Préparation paie', // supprimé
+  // payslips: 'Bulletins',  // supprimé
 };
 
 const Sidebar = ({ currentPath = '/', onNavigate, user }) => {

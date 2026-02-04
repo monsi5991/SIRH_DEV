@@ -128,7 +128,7 @@ function EmployeeProfile360({ employeeId, onClose }) {
             </CardContent>
           </Card>
 
-          {/* ✅ Rémunération & Paie (affichage optionnel, ne casse rien si backend ne renvoie pas ces champs) */}
+          {/* ✅ Rémunération & Paie (optionnel) */}
           <Card>
             <CardHeader><CardTitle className="text-lg">Rémunération & Paie</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-2 gap-3 text-sm">
@@ -247,9 +247,6 @@ export default function AnnuairePage() {
 
   const [formOpen, setFormOpen] = useState(false);
   const [editEmployee, setEditEmployee] = useState(null);
-
-  const departments = ['Tous', 'RH', 'Finance', 'Operations', 'IT'];
-  const sites = ['Tous', 'Dakar', 'Thiès', 'Saint-Louis'];
 
   const handleCreateClick = () => { setEditEmployee(null); setFormOpen(true); };
   const handleEditClick = (emp) => { setEditEmployee(emp); setFormOpen(true); };

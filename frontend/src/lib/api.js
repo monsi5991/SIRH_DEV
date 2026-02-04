@@ -1,141 +1,113 @@
 // frontend/src/lib/api.js
+// Client HTTP minimal avec gestion d'auth (Bearer) + refresh automatique
 
-// ---- Base URL ----
-const BASE_URL =
-  (typeof process !== "undefined" && process.env && process.env.REACT_APP_API_URL) ||
-  (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_API_URL) ||
-  "http://localhost:4000";
+export const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:4000";
 
-// ---- Token helpers ----
-const ACCESS_KEY = "sirh_access";
-
-function getAccess() {
-  try { return localStorage.getItem(ACCESS_KEY) || ""; } catch { return ""; }
+// --- utils
+async function readJson(res) {
+  const text = await res.text();
+  if (!text) return {};
+  try { return JSON.parse(text); } catch {
+    return { raw: text };
+  }
 }
-function setAccess(token) {
+
+async function safeReadError(res) {
+  try { return await readJson(res); } catch {
+    return { error: `HTTP ${res.status}` };
+  }
+}
+
+// --- accès au token local
+export function _getAccess() {
   try {
-    if (token) localStorage.setItem(ACCESS_KEY, token);
-    else localStorage.removeItem(ACCESS_KEY);
-  } catch { /* ignore */ }
+    return localStorage.getItem("sirh_access") || null;
+  } catch (err) {
+    console.warn("[api] _getAccess localStorage error:", err);
+    return null;
+  }
 }
-
-function buildAuthHeaders(headers = {}) {
-  const t = getAccess();
-  return t ? { ...headers, Authorization: `Bearer ${t}` } : headers;
-}
-
-// ---- Low-level fetch (sans logique 401) ----
-async function rawRequest(
-  path,
-  { method = "GET", body, headers = {}, credentials = "omit", signal } = {}
-) {
-  const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
-  const finalHeaders = isFormData
-    ? { Accept: "application/json", ...headers }
-    : { "Content-Type": "application/json", Accept: "application/json", ...headers };
-
-  let res;
+export function _setAccess(token) {
   try {
-    res = await fetch(BASE_URL + path, {
-      method,
-      headers: finalHeaders,
-      body: isFormData ? body : body != null ? JSON.stringify(body) : undefined,
-      credentials, // "include" pour /auth/refresh, login/register si cookie
-      signal,
-    });
-  } catch (e) {
-    // ⚠️ Ne pas transformer un AbortError en "Network error"
-    if (e && e.name === "AbortError") {
-      const err = new Error("AbortError");
-      err.name = "AbortError";
-      err.status = 0;
-      err.cause = e;
-      throw err;
-    }
-    const err = new Error("Network error");
-    err.status = 0;
-    err.cause = e;
-    throw err;
+    if (!token) localStorage.removeItem("sirh_access");
+    else localStorage.setItem("sirh_access", token);
+  } catch (err) {
+    console.warn("[api] _setAccess localStorage error:", err);
   }
-
-  const contentType = res.headers.get("content-type") || "";
-  let data;
-  if (res.status === 204) {
-    data = {};
-  } else if (contentType.includes("application/json")) {
-    try { data = await res.json(); } catch { data = {}; }
-  } else {
-    const text = await res.text();
-    try { data = text ? JSON.parse(text) : {}; } catch { data = { message: text }; }
+}
+export function _clearAccess() {
+  try {
+    localStorage.removeItem("sirh_access");
+  } catch (err) {
+    console.warn("[api] _clearAccess localStorage error:", err);
   }
-
-  return { res, data };
 }
 
-// ---- Refresh (mutualisé) ----
-let refreshingPromise = null;
-async function refreshAccessToken() {
-  if (!refreshingPromise) {
-    refreshingPromise = (async () => {
-      const { res, data } = await rawRequest("/auth/refresh", {
-        method: "POST",
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error(data?.error || "Refresh failed");
-      if (data?.accessToken) setAccess(data.accessToken);
-      return true;
-    })().finally(() => { refreshingPromise = null; });
-  }
-  return refreshingPromise;
-}
+// --- requêtes brutes
+async function rawRequest(path, { method = "GET", headers = {}, body, credentials } = {}) {
+  const url = `${API_BASE_URL}${path}`;
 
-// ---- API publique (auto-refresh 401) ----
-export async function request(path, options = {}) {
-  let { res, data } = await rawRequest(path, {
-    ...options,
-    headers: buildAuthHeaders(options.headers),
-    credentials: options.credentials ?? "omit",
+  const h = { "Content-Type": "application/json", ...headers };
+
+  // ajoute le Bearer si dispo et pas déjà fourni
+  const token = _getAccess();
+  if (token && !h.Authorization) h.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(url, {
+    method,
+    headers: h,
+    body: body ? JSON.stringify(body) : undefined,
+    // NB: on met credentials uniquement si demandé (login/refresh, etc.)
+    credentials,
   });
 
-  if (res.status === 401) {
-    try {
-      await refreshAccessToken();
-      ({ res, data } = await rawRequest(path, {
-        ...options,
-        headers: buildAuthHeaders(options.headers),
-        credentials: options.credentials ?? "omit",
-      }));
-    } catch {
-      setAccess("");
-      const err = new Error("Unauthorized");
-      err.status = 401;
-      throw err;
-    }
-  }
-
-  if (!res.ok) {
-    const msg =
-      data?.error ||
-      data?.message ||
-      (typeof data === "string" ? data : `HTTP ${res.status}`);
-    const err = new Error(msg);
-    err.status = res.status;
-    err.payload = data;
-    throw err;
-  }
-
-  return data;
+  return res;
 }
 
-// ---- Helpers HTTP ----
-export const get   = (p, opt)       => request(p, { ...opt, method: "GET" });
-export const post  = (p, body, opt) => request(p, { ...opt, method: "POST", body });
-export const put   = (p, body, opt) => request(p, { ...opt, method: "PUT", body });
-export const patch = (p, body, opt) => request(p, { ...opt, method: "PATCH", body });
-export const del   = (p, opt)       => request(p, { ...opt, method: "DELETE" });
+// --- API conviviale avec retry sur 401 (refresh)
+export async function request(path, options = {}) {
+  let res = await rawRequest(path, options);
 
-// ---- Exports utilitaires ----
-export const withAuthHeaders = buildAuthHeaders;
-export const _setAccess = setAccess;
-export const _getAccess = getAccess;
-export const API_BASE_URL = BASE_URL;
+  if (res.ok) return readJson(res);
+
+  // En cas de 401 → tente un refresh via cookie puis rejoue une fois
+  if (res.status === 401) {
+    const refreshRes = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include", // indispensable pour envoyer le cookie refresh
+    });
+
+    if (refreshRes.ok) {
+      const data = await readJson(refreshRes);
+      if (data?.accessToken) {
+        _setAccess(data.accessToken); // 🔑 on sauve le nouveau token !
+      }
+      // rejouer la requête initiale
+      res = await rawRequest(path, options);
+      if (res.ok) return readJson(res);
+    }
+
+    // si le refresh échoue → nettoyage et erreur claire
+    try {
+      _clearAccess();
+      localStorage.removeItem("sirh_user");
+    } catch (err) {
+      console.warn("[api] cleanup after 401 failed:", err);
+    }
+    const err = await safeReadError(res);
+    throw new Error(err?.error || "Unauthorized");
+  }
+
+  // autres erreurs
+  const err = await safeReadError(res);
+  throw new Error(err?.error || `HTTP ${res.status}`);
+}
+
+// --- raccourcis
+export const get   = (p, opts = {})        => request(p, { method: "GET",    ...opts });
+export const post  = (p, b, opts = {})     => request(p, { method: "POST", body: b, ...opts });
+export const put   = (p, b, opts = {})     => request(p, { method: "PUT",  body: b, ...opts });
+export const del   = (p, opts = {})        => request(p, { method: "DELETE",   ...opts });
+// 👇 ajouté pour vos imports existants (useEmployees, EmployeeEditPage, etc.)
+export const patch = (p, b, opts = {})     => request(p, { method: "PATCH", body: b, ...opts });
