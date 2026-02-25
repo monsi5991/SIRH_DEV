@@ -35,64 +35,90 @@ const saveNumber = (k, n) => {
   }
 };
 
-const navigationItems = [
-  { key: 'home', icon: Home, path: '/', feature: null, children: [] },
-  {
-    key: 'myspace', icon: User, path: null, feature: null, children: [
-      // Partie paie supprimée: { key: 'myPayslips', path: '/me/payslips', feature: null },
-    ]
-  },
-  {
-    key: 'operations', icon: Clock, path: null, feature: null, children: [
-      { key: 'leaves',        path: '/operations/leaves',    feature: 'leaves' },
-      { key: 'timeTracking',  path: '/operations/time',      feature: 'timeTracking' },
-      { key: 'events',        path: '/operations/planning',  feature: 'events' },
-      { key: 'expenses',      path: '/operations/expenses',  feature: 'expenses' }
-    ]
-  },
-  // Section paie supprimée:
-  // {
-  //   key: 'payroll', icon: Receipt, path: null, feature: 'payroll', plan: 'panafrica', children: [
-  //     { key: 'payPrep',  path: '/payroll/preparation', feature: 'payPrep' },
-  //     { key: 'payslips', path: '/payroll/payslips',    feature: 'payslips' }
-  //   ]
-  // },
-  {
-    key: 'documents', icon: FileText, path: null, feature: null, children: [
-      { key: 'onboarding',  path: '/documents/onboarding',  feature: 'onboarding' },
-      { key: 'offboarding', path: '/documents/offboarding', feature: null }
-    ]
-  },
-  {
-    key: 'people', icon: Users, path: null, feature: null, children: [
-      { key: 'directory',   path: '/people/directory',   feature: 'directory' },
-      { key: 'performance', path: '/people/performance', feature: 'performance' },
-      { key: 'training',    path: '/people/training',    feature: 'training' }
-    ]
-  },
-  {
-    key: 'resources', icon: BookOpen, path: null, feature: null, children: [
-      { key: 'compliance', path: '/resources/compliance', feature: null },
-      { key: 'policies',   path: '/resources/policies',   feature: null }
-    ]
-  },
-  {
-    key: 'analytics', icon: BarChart3, path: null, feature: null, children: [
-      { key: 'reports',   path: '/analytics/reports',    feature: null },
-      { key: 'dashboards',path: '/analytics/dashboards', feature: 'advancedAnalytics' }
-    ]
-  }
-];
-
-const adminItems = [
-  {
-    key: 'admin', icon: Settings, path: null, feature: null, children: [
-      { key: 'structure',    path: '/admin/structure',    feature: null },
-      { key: 'permissions',  path: '/admin/permissions',  feature: null },
-      { key: 'integrations', path: '/admin/integrations', feature: null }
-    ]
-  }
-];
+const SIDEBAR_BY_PERSONA = {
+  rh: [
+    { key: 'home', icon: Home, path: '/', feature: null, children: [] },
+    {
+      key: 'hrSpace', icon: Users, path: null, feature: null, roles: ['RH'], children: [
+        { key: 'hrWorkforcePlanning', path: '/hr/workforce-planning', feature: null, roles: ['RH'] },
+        { key: 'hrStrategicReviews', path: '/hr/strategic-reviews', feature: null, roles: ['RH'] },
+      ]
+    },
+    {
+      key: 'operations', icon: Clock, path: null, feature: null, permissions: ['operations_read', 'all'], roles: ['RH'], children: [
+        { key: 'leaves', path: '/operations/leaves', feature: 'leaves', permissions: ['operations_read', 'all'], roles: ['RH'] },
+        { key: 'timeTracking', path: '/operations/time', feature: 'timeTracking', permissions: ['operations_read', 'all'], roles: ['RH'] },
+        { key: 'events', path: '/operations/planning', feature: 'events', permissions: ['operations_read', 'all'], roles: ['RH'] },
+        { key: 'expenses', path: '/operations/expenses', feature: 'expenses', permissions: ['operations_read', 'all'], roles: ['RH'] }
+      ]
+    },
+    {
+      key: 'documents', icon: FileText, path: null, feature: null, permissions: ['directory_read', 'all'], roles: ['RH'], children: [
+        { key: 'onboarding', path: '/documents/onboarding', feature: 'onboarding', permissions: ['directory_read', 'all'], roles: ['RH'] },
+        { key: 'offboarding', path: '/documents/offboarding', feature: null, permissions: ['directory_read', 'all'], roles: ['RH'] }
+      ]
+    },
+    {
+      key: 'people', icon: Users, path: null, feature: null, permissions: ['directory_read', 'all'], roles: ['RH'], children: [
+        { key: 'directory', path: '/people/directory', feature: 'directory', permissions: ['directory_read', 'all'], roles: ['RH'] },
+        { key: 'performance', path: '/people/performance', feature: 'performance', permissions: ['directory_read', 'all'], roles: ['RH'] },
+        { key: 'training', path: '/people/training', feature: 'training', permissions: ['directory_read', 'all'], roles: ['RH'] }
+      ]
+    },
+    {
+      key: 'resources', icon: BookOpen, path: null, feature: null, permissions: ['directory_read', 'all'], roles: ['RH'], children: [
+        { key: 'compliance', path: '/resources/compliance', feature: null, permissions: ['directory_read', 'all'], roles: ['RH'] },
+        { key: 'policies', path: '/resources/policies', feature: null, permissions: ['directory_read', 'all'], roles: ['RH'] }
+      ]
+    },
+    {
+      key: 'analytics', icon: BarChart3, path: null, feature: null, permissions: ['analytics_read', 'all'], roles: ['RH'], children: [
+        { key: 'reports', path: '/analytics/reports', feature: null, permissions: ['analytics_read', 'all'], roles: ['RH'] },
+        { key: 'dashboards', path: '/analytics/dashboards', feature: 'advancedAnalytics', permissions: ['analytics_read', 'all'], roles: ['RH'] }
+      ]
+    },
+    {
+      key: 'admin', icon: Settings, path: null, feature: null, permissions: ['admin_read', 'all'], roles: ['RH'], children: [
+        { key: 'structure', path: '/admin/structure', feature: null, permissions: ['admin_read', 'all'], roles: ['RH'] },
+        { key: 'permissions', path: '/admin/permissions', feature: null, permissions: ['admin_read', 'all'], roles: ['RH'] },
+        { key: 'integrations', path: '/admin/integrations', feature: null, permissions: ['admin_read', 'all'], roles: ['RH'] }
+      ]
+    }
+  ],
+  manager: [
+    { key: 'home', icon: Home, path: '/', feature: null, children: [] },
+    {
+      key: 'managerSpace', icon: Users, path: null, feature: null, permissions: ['team_read', 'all'], roles: ['Manager'], children: [
+        { key: 'managerDashboard', path: '/manager/dashboard', feature: null, permissions: ['team_read', 'all'], roles: ['Manager'] },
+        { key: 'managerTeamOverview', path: '/manager/team-overview', feature: null, permissions: ['team_read', 'all'], roles: ['Manager'] },
+        { key: 'teamApprovals', path: '/manager/approvals', feature: null, permissions: ['approvals_read', 'all'], roles: ['Manager'] },
+        { key: 'managerPerformance', path: '/manager/performance', feature: null, permissions: ['team_read', 'all'], roles: ['Manager'] }
+      ]
+    },
+    {
+      key: 'resources', icon: BookOpen, path: null, feature: null, permissions: ['directory_read', 'all'], roles: ['Manager'], children: [
+        { key: 'policies', path: '/resources/policies', feature: null, permissions: ['directory_read', 'all'], roles: ['Manager'] }
+      ]
+    }
+  ],
+  employee: [
+    { key: 'home', icon: Home, path: '/', feature: null, children: [] },
+    {
+      key: 'employeeSpace', icon: User, path: null, feature: null, permissions: ['self_read', 'all'], roles: ['Employee'], children: [
+        { key: 'employeeDashboard', path: '/employee/dashboard', feature: null, permissions: ['self_read', 'all'], roles: ['Employee'] },
+        { key: 'employeeRequests', path: '/employee/requests', feature: null, permissions: ['self_read', 'all'], roles: ['Employee'] },
+        { key: 'employeeDocuments', path: '/employee/documents', feature: null, permissions: ['self_read', 'all'], roles: ['Employee'] },
+        { key: 'myProfile', path: '/employee/profile', feature: null, permissions: ['self_read', 'all'], roles: ['Employee'] },
+        { key: 'myPayslips', path: '/me/payslips', feature: null, permissions: ['self_read', 'all'], roles: ['Employee'] },
+      ]
+    },
+    {
+      key: 'resources', icon: BookOpen, path: null, feature: null, permissions: ['self_read', 'directory_read', 'all'], roles: ['Employee'], children: [
+        { key: 'policies', path: '/resources/policies', feature: null, permissions: ['self_read', 'directory_read', 'all'], roles: ['Employee'] }
+      ]
+    }
+  ]
+};
 
 const isFeatureLocked = (feature, user) => {
   if (!feature) return false;
@@ -113,8 +139,20 @@ const isFeatureLocked = (feature, user) => {
 
 const labelOverride = {
   home: 'Tableau de bord',
-  myspace: 'Mon espace',
-  // myPayslips: 'Mes bulletins', // supprimé
+  hrSpace: 'Espace RH',
+  hrWorkforcePlanning: 'Workforce planning',
+  hrStrategicReviews: 'Revues stratégiques',
+  employeeSpace: 'Espace employé',
+  employeeDashboard: 'Mon tableau de bord',
+  employeeRequests: 'Mes demandes',
+  employeeDocuments: 'Mes documents',
+  myProfile: 'Mon profil RH',
+  myPayslips: 'Mes bulletins',
+  managerSpace: 'Espace manager',
+  managerDashboard: 'Tableau manager',
+  managerTeamOverview: 'Vue équipe',
+  managerPerformance: 'Performance équipe',
+  teamApprovals: 'Validations équipe',
   operations: 'Opérations',
   people: 'RH / People',
   documents: 'Documents',
@@ -135,7 +173,7 @@ const labelOverride = {
 
 const Sidebar = ({ currentPath = '/', onNavigate, user }) => {
   const { t } = useApp();
-  const [expandedItems, setExpandedItems] = useState(['operations', 'people', 'myspace']);
+  const [expandedItems, setExpandedItems] = useState(['operations', 'people', 'employeeSpace', 'managerSpace', 'hrSpace']);
   const [counts, setCounts] = useState({ leaves: 0, timesheets: 0, expenses: 0, events: 0, total: 0 });
   const [peopleCounts, setPeopleCounts] = useState({ directory: 0, performance: 0, training: 0, total: 0 });
 
@@ -330,6 +368,37 @@ const Sidebar = ({ currentPath = '/', onNavigate, user }) => {
     setExpandedItems(prev => prev.includes(key) ? prev.filter(item => item !== key) : [...prev, key]);
   };
 
+  const userRoles = (user?.roles || [])
+    .map(r => (typeof r === 'string' ? r : r?.name))
+    .filter(Boolean);
+  const userPermissions = Array.isArray(user?.permissions) ? user.permissions : [];
+
+  const hasAnyPermission = (required) => {
+    if (!required || !required.length) return true;
+    if (userPermissions.includes('all')) return true;
+    return required.some((p) => userPermissions.includes(p));
+  };
+
+  const hasAnyRole = (required) => {
+    if (!required || !required.length) return true;
+    return required.some((r) => userRoles.includes(r));
+  };
+
+  const canAccess = (item) => {
+    if (!item) return false;
+    if (!hasAnyPermission(item.permissions || [])) return false;
+    if (!hasAnyRole(item.roles || [])) return false;
+    return true;
+  };
+
+  const persona = userRoles.includes('RH')
+    ? 'rh'
+    : userRoles.includes('Manager')
+      ? 'manager'
+      : 'employee';
+
+  const sidebarItems = SIDEBAR_BY_PERSONA[persona] || SIDEBAR_BY_PERSONA.employee;
+
   const getValidationCountForItem = (itemKey) => {
     if (itemKey === 'operations') {
       const isExpanded = expandedItems.includes('operations');
@@ -352,8 +421,13 @@ const Sidebar = ({ currentPath = '/', onNavigate, user }) => {
   };
 
   const renderNavItem = (item, level = 0) => {
+    if (!canAccess(item)) return null;
+
     const isExpanded  = expandedItems.includes(item.key);
-    const hasChildren = Array.isArray(item.children) && item.children.length > 0;
+    const visibleChildren = Array.isArray(item.children)
+      ? item.children.filter((child) => canAccess(child))
+      : [];
+    const hasChildren = visibleChildren.length > 0;
     const isLocked    = item.feature ? isFeatureLocked(item.feature, user) : false;
     const isActive    = item.path === currentPath;
     const Icon        = item.icon;
@@ -418,7 +492,7 @@ const Sidebar = ({ currentPath = '/', onNavigate, user }) => {
 
         {hasChildren && isExpanded && (
           <div className="mt-1 mb-2">
-            {item.children.map(child => renderNavItem(child, level + 1))}
+            {visibleChildren.map(child => renderNavItem(child, level + 1))}
           </div>
         )}
       </div>
@@ -442,13 +516,7 @@ const Sidebar = ({ currentPath = '/', onNavigate, user }) => {
 
       <div className="flex-1 py-4 overflow-y-auto">
         <div className="space-y-1">
-          {navigationItems.map(item => renderNavItem(item))}
-        </div>
-
-        <div className="mt-8 pt-4 border-t border-gray-200 mx-4">
-          <div className="space-y-1">
-            {adminItems.map(item => renderNavItem(item))}
-          </div>
+          {sidebarItems.map(item => renderNavItem(item))}
         </div>
       </div>
 
