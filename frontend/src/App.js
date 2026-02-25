@@ -4,15 +4,12 @@ import "./App.css";
 import { BrowserRouter, Routes, Route, Outlet, useLocation, useNavigate } from "react-router-dom";
 import PropTypes from "prop-types";
 
-import { AuthProvider } from "./contexts/AuthContext";
-import { AppProvider } from "./contexts/AppContext";
 import { Toaster } from "./components/ui/toaster";
 
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 
 // Public pages
 import LoginPage from "./pages/auth/LoginPage";
-import RegisterPage from "./pages/auth/RegisterPage";
 import ForbiddenPage from "./pages/ForbiddenPage";
 
 // Layout
@@ -102,7 +99,6 @@ function AppRoutes() {
     <Routes>
       {/* Public */}
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
       <Route path="/403" element={<ForbiddenPage />} />
 
       {/* Protected group */}
@@ -237,15 +233,11 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppProvider>
-        <div className="App">
-          <BrowserRouter>
-            <AppRoutes />
-          </BrowserRouter>
-          <Toaster />
-        </div>
-      </AppProvider>
-    </AuthProvider>
+    <div className="App">
+      <BrowserRouter>
+        <AppRoutes />
+      </BrowserRouter>
+      <Toaster />
+    </div>
   );
 }

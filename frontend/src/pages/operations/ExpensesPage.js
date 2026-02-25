@@ -6,7 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/ca
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
 import { Receipt, CheckCircle, XCircle, DollarSign, Plus, Trash2 } from "lucide-react";
+import ExpenseFormDialog from "../../components/operations/ExpenseFormDialog";
 import { useApp } from "../../contexts/AppContext";
+import { kpiStart, kpiSuccess, kpiError } from "../../lib/kpiTracker";
 
 const hashRows = (arr) => {
   try {
@@ -33,6 +35,7 @@ export default function ExpensesPage() {
 
   const [rows, setRows] = useState([]);
   const [statusFilter, setStatusFilter] = useState("");
+  const [openCreate, setOpenCreate] = useState(false);
 
   const refs = useRef({});
   const abortRef = useRef(null);
@@ -100,17 +103,17 @@ export default function ExpensesPage() {
     });
   }, [location.search, location.hash, rows]);
 
-  const addExpense = async () => {
-    const employee = prompt("Employé", "John Doe");
-    if (!employee) return;
-    const date = prompt("Date (YYYY-MM-DD)", new Date().toISOString().slice(0,10));
-    const category = prompt("Catégorie", "Repas");
-    const amount = Number(prompt("Montant", "25000"));
-    const currency = prompt("Devise", "XOF") || "XOF";
-    // ✅ traitement fiscal optionnel
-    const taxTreatment = prompt("Traitement fiscal (REIMBURSEMENT, BENEFIT_TAXABLE, PER_DIEM_EXEMPT) [optionnel]", "REIMBURSEMENT") || undefined;
-
-    await post("/operations/expenses", { employee, date, category, amount, currency, taxTreatment });
+  const addExpense = async (payload) => {
+    const t0 = kpiStart("expenses");
+    try {
+      await post("/operations/expenses", payload);
+      const required = [payload.employee, payload.date, payload.category, payload.amount];
+      const filled = required.filter(Boolean).length / required.length;
+      kpiSuccess("expenses", t0, filled);
+    } catch (e) {
+      kpiError("expenses");
+      throw e;
+    }
 
     await load().catch(() => undefined);
     const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 50));
@@ -121,7 +124,7 @@ export default function ExpensesPage() {
   };
 
   const updateStatus = async (id, status) => {
-    await putReq(`/operations/expenses/${id}/status`, { status });
+    await putReq(`/operations/expenses/${id}`, { status });
     setRows(prev => prev.map(r => r.id === id ? { ...r, status } : r));
     const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 50));
     idle(() => {
@@ -173,7 +176,7 @@ export default function ExpensesPage() {
             <option value="Paid">Paid</option>
             <option value="Rejected">Rejected</option>
           </select>
-          <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={addExpense}>
+          <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => setOpenCreate(true)}>
             <Plus className="w-4 h-4 mr-2" /> Ajouter
           </Button>
         </div>
@@ -246,6 +249,8 @@ export default function ExpensesPage() {
           </div>
         </CardContent>
       </Card>
+
+      <ExpenseFormDialog open={openCreate} onClose={() => setOpenCreate(false)} onSubmit={addExpense} />
     </div>
   );
 }
