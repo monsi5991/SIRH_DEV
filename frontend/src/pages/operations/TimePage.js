@@ -8,6 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/ca
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
 import { CalendarDays, CheckCircle, XCircle, Eye, Plus, Trash2 } from "lucide-react";
+import TimesheetFormDialog from "../../components/operations/TimesheetFormDialog";
+import { kpiStart, kpiSuccess, kpiError } from "../../lib/kpiTracker";
 
 /* ----------------------------------------------------
  * Helpers
@@ -332,6 +334,7 @@ export default function TimePage() {
 
   const [rows, setRows] = useState([]);          // brut API
   const [statusFilter, setStatusFilter] = useState("");
+  const [openCreate, setOpenCreate] = useState(false);
   const [openDetail, setOpenDetail] = useState(false);
   const [detailCtx, setDetailCtx] = useState(null); // { employee, year, month, items: [] }
 
@@ -417,19 +420,17 @@ export default function TimePage() {
   };
 
   // Actions globales (création/maj/suppression)
-  const addTimesheet = async () => {
-    const employee = prompt("Employé", "Awa Diop");
-    if (!employee) return;
-    const date = prompt("Date (YYYY-MM-DD)", new Date().toISOString().slice(0, 10));
-    const hours = Number(prompt("Heures", "8"));
-    const project = prompt("Projet (optionnel)", "Run RH");
-    const note = prompt("Note (optionnel)", "");
-    // ✅ champs optionnels pour la paie SN (fallback si vide)
-    const type = prompt("Type (REG, OT_DAY, OT_NIGHT, OT_SUN, OT_HOL) [optionnel]", "REG") || undefined;
-    const premiumStr = prompt("Premium override ex: 0.15 [optionnel]", "");
-    const premium = premiumStr === "" ? undefined : Number(premiumStr);
-
-    await post("/operations/timesheets", { employee, date, hours, project, note, status: "Submitted", type, premium });
+  const addTimesheet = async (payload) => {
+    const t0 = kpiStart("timesheets");
+    try {
+      await post("/operations/timesheets", { ...payload, status: "Submitted" });
+      const required = [payload.employee, payload.date, payload.hours];
+      const filled = required.filter(Boolean).length / required.length;
+      kpiSuccess("timesheets", t0, filled);
+    } catch (e) {
+      kpiError("timesheets");
+      throw e;
+    }
     await load().catch(() => undefined);
     idle(() => {
       refreshValidationCounts?.().catch(() => undefined);
@@ -438,7 +439,7 @@ export default function TimePage() {
   };
 
   const bulkStatus = async (ids, status) => {
-    await Promise.allSettled(ids.map((id) => putReq(`/operations/timesheets/${id}/status`, { status })));
+    await Promise.allSettled(ids.map((id) => putReq(`/operations/timesheets/${id}`, { status })));
     setRows((prev) => prev.map((r) => (ids.includes(r.id) ? { ...r, status } : r)));
     idle(() => {
       refreshValidationCounts?.().catch(() => undefined);
@@ -470,7 +471,7 @@ export default function TimePage() {
             <option value="Approved">Approved</option>
             <option value="Rejected">Rejected</option>
           </select>
-          <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={addTimesheet}>
+          <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => setOpenCreate(true)}>
             <Plus className="w-4 h-4 mr-2" /> Ajouter
           </Button>
         </div>
@@ -558,6 +559,8 @@ export default function TimePage() {
           formatDate={formatDate}
         />
       )}
+
+      <TimesheetFormDialog open={openCreate} onClose={() => setOpenCreate(false)} onSubmit={addTimesheet} />
     </div>
   );
 }

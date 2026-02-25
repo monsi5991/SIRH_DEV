@@ -1,13 +1,12 @@
 // backend/src/routes/people/employees.js
 import express from "express";
 import { prisma } from "../../prisma.js";
-import { verifyAccess } from "../../auth.js";
 import { requirePermissions } from "../../rbac.js";
 
 const router = express.Router();
 
 // Toutes ces routes nécessitent un accès + lecture annuaire (comme ton code de base)
-router.use(verifyAccess, requirePermissions(["directory_read", "all"], "anyOf"));
+router.use(requirePermissions(["directory_read", "all"], "anyOf"));
 
 /**
  * GET /people/employees
