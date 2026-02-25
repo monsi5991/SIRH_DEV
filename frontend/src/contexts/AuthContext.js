@@ -1,167 +1,175 @@
 import React, {
-  createContext, useContext, useEffect, useMemo, useState, useCallback
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  useCallback,
 } from "react";
 import PropTypes from "prop-types";
 import * as api from "../lib/api";
+import { keycloak, initKeycloakOnce } from "../lib/keycloak";
 
-const AuthContext = createContext(null);
-export const useAuth = () => useContext(AuthContext);
+const AuthContext = createContext(undefined);
+
+export const useAuth = () => {
+  const ctx = useContext(AuthContext);
+  if (ctx === undefined) throw new Error("useAuth must be used within <AuthProvider />");
+  return ctx;
+};
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);        // boot
-  const [authLoading, setAuthLoading] = useState(false);
-  const [authError, setAuthError] = useState(null);
 
+  // ✅ état d’init Keycloak + chargement /me
+  const [kcReady, setKcReady] = useState(false);
+  const [kcAuthenticated, setKcAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const normalizeUser = useCallback((u) => {
+    if (!u) return null;
+    return {
+      ...u,
+      roles: Array.isArray(u.roles) ? u.roles : [],
+      permissions: Array.isArray(u.permissions) ? u.permissions : [],
+      dashboardConfig: u.dashboardConfig || { modules: [] },
+    };
+  }, []);
+
+  const loadMe = useCallback(async () => {
+    const me = await api.get("/me");
+    setUser(normalizeUser(me.user));
+  }, [normalizeUser]);
+
+  // ✅ BOOT: init Keycloak, puis /me si authentifié
   useEffect(() => {
+    let mounted = true;
+
     (async () => {
+      setLoading(true);
       try {
-        const me = await api.get("/me");
-        const normalized = normalizeUser(me.user);
-        setUser(normalized);
-        localStorage.setItem("sirh_user", JSON.stringify(normalized));
+        const authenticated = await initKeycloakOnce();
+        if (!mounted) return;
+
+        setKcReady(true);
+        setKcAuthenticated(!!authenticated);
+
+        if (authenticated) {
+          await loadMe();
+        } else {
+          setUser(null);
+        }
       } catch (e) {
-        // non connecté => état propre
-        setUser(null);
-        localStorage.removeItem("sirh_user");
-        localStorage.removeItem("sirh_access");
+        console.warn("Auth boot failed:", e);
+        if (mounted) {
+          setKcReady(true);
+          setKcAuthenticated(false);
+          setUser(null);
+        }
       } finally {
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
     })();
-  }, []);
 
-  useEffect(() => {
-    const onStorage = (e) => {
-      if (e.key === "sirh_user") {
-        const v = e.newValue ? normalizeUser(JSON.parse(e.newValue)) : null;
-        setUser(v);
-      }
-      // si un autre onglet remplace le token: noop (api lit le localStorage)
+    return () => {
+      mounted = false;
     };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+  }, [loadMe]);
+
+  // ✅ Refresh token périodique
+  useEffect(() => {
+    const t = setInterval(() => {
+      if (!keycloak.authenticated) return;
+      keycloak.updateToken(30).catch(() => {});
+    }, 10_000);
+    return () => clearInterval(t);
   }, []);
 
-  const saveAccess = (token) => {
-    if (!token) localStorage.removeItem("sirh_access");
-    else localStorage.setItem("sirh_access", token);
-  };
-
-  const login = useCallback(async (email, password) => {
-    setAuthLoading(true); setAuthError(null);
-    try {
-      const data = await api.post("/auth/login", { email, password }, { credentials: "include" });
-      const normalized = normalizeUser(data.user);
-      setUser(normalized);
-      localStorage.setItem("sirh_user", JSON.stringify(normalized));
-      if (data?.accessToken) saveAccess(data.accessToken);
-      return { success: true, user: normalized };
-    } catch (e) {
-      setAuthError(e.message || "Erreur de connexion");
-      return { success: false, error: e.message || "Erreur de connexion" };
-    } finally { setAuthLoading(false); }
-  }, []);
-
-  const register = useCallback(async (form) => {
-    setAuthLoading(true); setAuthError(null);
-    try {
-      const data = await api.post("/auth/register", form, { credentials: "include" });
-      const normalized = normalizeUser(data.user);
-      setUser(normalized);
-      localStorage.setItem("sirh_user", JSON.stringify(normalized));
-      if (data?.accessToken) saveAccess(data.accessToken);
-      return { success: true, user: normalized };
-    } catch (e) {
-      setAuthError(e.message || "Erreur d’inscription");
-      return { success: false, error: e.message || "Erreur d’inscription" };
-    } finally { setAuthLoading(false); }
+  const login = useCallback(async () => {
+    await initKeycloakOnce();
+    await keycloak.login({ redirectUri: window.location.origin + "/" });
   }, []);
 
   const logout = useCallback(async () => {
     try {
-      await api.post("/auth/logout", {}, { credentials: "include" });
-    } catch (e) {
-      // on s’assure tout de même d’invalider localement
-      console.warn("Logout: appel backend en erreur (continuation locale).", e);
-    }
-    localStorage.removeItem("sirh_user");
-    localStorage.removeItem("sirh_access");
-    setUser(null);
-  }, []);
-
-  const refresh = useCallback(async () => {
-    try {
-      const me = await api.get("/me");
-      const normalized = normalizeUser(me.user);
-      setUser(normalized);
-      localStorage.setItem("sirh_user", JSON.stringify(normalized));
-    } catch (e) {
-      console.warn("Refresh user failed, cleanup.", e);
+      await keycloak.logout({ redirectUri: window.location.origin + "/login" });
+    } finally {
       setUser(null);
-      localStorage.removeItem("sirh_user");
-      localStorage.removeItem("sirh_access");
+      setKcAuthenticated(false);
     }
   }, []);
 
-  const hasRole = useCallback((required) => {
-    if (!user) return false;
-    const roles = Array.isArray(user.roles) ? user.roles : (user?.role ? [user.role] : []);
-    const req = Array.isArray(required) ? required : [required];
-    return req.some((r) => roles.includes(r));
-  }, [user]);
+  const refreshUserFromApi = useCallback(async () => {
+    if (!keycloak.authenticated) return;
+    await loadMe();
+  }, [loadMe]);
 
-  const hasPermission = useCallback((permission) => {
-    const perms = Array.isArray(user?.permissions) ? user.permissions : [];
-    return perms.includes("all") || perms.includes(permission);
-  }, [user]);
+  const hasRole = useCallback(
+    (required) => {
+      if (!user) return false;
+      const roles = Array.isArray(user.roles) ? user.roles : [];
+      const req = Array.isArray(required) ? required : [required];
+      return req.some((r) => roles.includes(r));
+    },
+    [user]
+  );
 
-  const hasPermissions = useCallback((required, mode = "allOf") => {
-    const req = Array.isArray(required) ? required : [required];
-    const perms = Array.isArray(user?.permissions) ? user.permissions : [];
-    if (perms.includes("all")) return true;
-    return mode === "allOf" ? req.every((p) => perms.includes(p)) : req.some((p) => perms.includes(p));
-  }, [user]);
+  const hasPermission = useCallback(
+    (permission) => {
+      const perms = Array.isArray(user?.permissions) ? user.permissions : [];
+      return perms.includes("all") || perms.includes(permission);
+    },
+    [user]
+  );
 
-  const canAccessModule = useCallback((module) => {
-    const modules = user?.dashboardConfig?.modules || [];
-    return modules.includes(module);
-  }, [user]);
+  const hasPermissions = useCallback(
+    (required, mode = "allOf") => {
+      const req = Array.isArray(required) ? required : [required];
+      const perms = Array.isArray(user?.permissions) ? user.permissions : [];
+      if (perms.includes("all")) return true;
+      return mode === "allOf"
+        ? req.every((p) => perms.includes(p))
+        : req.some((p) => perms.includes(p));
+    },
+    [user]
+  );
 
-  const value = useMemo(() => ({
-    user,
-    loading,
-    authLoading,
-    authError,
-    isAuthenticated: !!user,
-    login,
-    logout,
-    register,
-    refresh,
-    hasRole,
-    hasPermission,
-    hasPermissions,
-    canAccessModule,
-    updateUser: (patch) => setUser((prev) => {
-      const next = normalizeUser({ ...(prev || {}), ...(patch || {}) });
-      localStorage.setItem("sirh_user", JSON.stringify(next));
-      return next;
+  // ✅ Auth “réel” = Keycloak authentifié + user DB chargé
+  const isAuthenticated = !!kcAuthenticated && !!user;
+
+  const value = useMemo(
+    () => ({
+      user,
+      loading,
+      kcReady,
+      kcAuthenticated,
+      isAuthenticated,
+      token: keycloak.token,
+
+      login,
+      logout,
+      refresh: refreshUserFromApi,
+
+      hasRole,
+      hasPermission,
+      hasPermissions,
     }),
-  }), [user, loading, authLoading, authError, login, logout, register, refresh, hasRole, hasPermission, hasPermissions, canAccessModule]);
+    [
+      user,
+      loading,
+      kcReady,
+      kcAuthenticated,
+      isAuthenticated,
+      refreshUserFromApi,
+      login,
+      logout,
+      hasRole,
+      hasPermission,
+      hasPermissions,
+    ]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-AuthProvider.propTypes = {
-  children: PropTypes.node,
-};
-
-function normalizeUser(u) {
-  if (!u) return null;
-  return {
-    ...u,
-    roles: Array.isArray(u.roles) ? u.roles : (u.role ? [u.role] : []),
-    permissions: Array.isArray(u.permissions) ? u.permissions : [],
-    dashboardConfig: u.dashboardConfig || { modules: [] },
-  };
-}
+AuthProvider.propTypes = { children: PropTypes.node };

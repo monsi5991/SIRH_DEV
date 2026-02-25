@@ -19,16 +19,57 @@ export function signAccess(user) {
   return jwt.sign(payload, ACCESS_SECRET, { expiresIn: ACCESS_TTL });
 }
 
-export function verifyAccess(req, res, next) {
+export async function verifyAccess(req, res, next) {
   try {
     const auth = req.headers.authorization || "";
     const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
     if (!token) return res.status(401).json({ error: "Missing access token" });
-    const decoded = jwt.verify(token, ACCESS_SECRET);
-    req.auth = decoded; // { sub, tid, iat, exp }
-    next();
-  } catch {
-    return res.status(401).json({ error: "Invalid access token" });
+
+    // ---- Vérif Keycloak JWT (JWKS) ----
+    const { createRemoteJWKSet, jwtVerify } = await import("jose");
+
+    const ISSUER = process.env.KEYCLOAK_ISSUER;
+    const AUDIENCE = process.env.KEYCLOAK_AUDIENCE;
+
+    if (!ISSUER || !AUDIENCE) {
+      return res.status(500).json({ error: "Missing KEYCLOAK_ISSUER or KEYCLOAK_AUDIENCE" });
+    }
+
+    const jwks = createRemoteJWKSet(new URL(`${ISSUER}/protocol/openid-connect/certs`));
+
+    const { payload } = await jwtVerify(token, jwks, {
+      issuer: ISSUER,
+      audience: AUDIENCE,
+    });
+
+    // ---- Mapper Keycloak -> ton user Prisma ----
+    // On s’appuie sur l’email (plus simple dans ton projet)
+    const email = payload.email;
+    if (!email) return res.status(401).json({ error: "Token has no email" });
+
+    const { prisma } = await import("./prisma.js");
+    const user = await prisma.user.findUnique({ where: { email } });
+
+    if (!user) {
+      // Pour rester simple: on exige que l’utilisateur existe en DB
+      // (tu le crées via /auth/register, puis tu crées le même email dans Keycloak)
+      return res.status(401).json({ error: "User not found in DB for this email" });
+    }
+
+    // On reconstitue req.auth comme avant
+    req.auth = { sub: user.id, tid: user.tenantId };
+
+    // Bonus : on garde les rôles keycloak si tu veux t’en servir
+    req.kc = {
+      sub: payload.sub,
+      email: payload.email,
+      roles: payload?.realm_access?.roles ?? [],
+      raw: payload,
+    };
+
+    return next();
+  } catch (e) {
+    return res.status(401).json({ error: "Invalid access token", detail: String(e?.message || e) });
   }
 }
 

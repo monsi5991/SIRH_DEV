@@ -1,28 +1,41 @@
-import { get, post, patch, del } from './api';
+// frontend/src/lib/documentsApi.js
+import { get, post } from "./api";
 
-// --- ONBOARDING ---
+// ------------------------
+// Templates
+// ------------------------
+export const listTemplates = async (category) => {
+  // category: "onboarding" | "offboarding"
+  const res = await get("/documents/templates", { category });
+  // Ton backend renvoie { onboarding: [...], offboarding: [...] }
+  // On normalise pour renvoyer juste la liste demandée
+  if (category === "onboarding") return res?.onboarding || [];
+  if (category === "offboarding") return res?.offboarding || [];
+  return [];
+};
+
+// ------------------------
+// Onboarding
+// ------------------------
 export const listOnboarding = (params = {}) =>
-  get('/documents/onboarding/cases', params);
+  get("/documents/onboarding/cases", params);
 
-export const createOnboarding = (data) =>
-  post('/documents/onboarding/cases', data);
+export const startOnboarding = (data) =>
+  post("/documents/onboarding/start", data);
 
-export const updateOnboardingStatus = (id, status) =>
-  patch(`/documents/onboarding/cases/${id}/status`, { status });
-
-export const getOnboarding = (id) => get(`/documents/onboarding/cases/${id}`);
-
-export const uploadDoc = (formData) =>
-  post('/documents/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-
-// --- OFFBOARDING ---
+// ------------------------
+// Offboarding
+// ------------------------
 export const listOffboarding = (params = {}) =>
-  get('/documents/offboarding/cases', params);
+  get("/documents/offboarding/cases", params);
 
-export const createOffboarding = (data) =>
-  post('/documents/offboarding/cases', data);
+export const startOffboarding = (data) =>
+  post("/documents/offboarding/start", data);
 
-export const updateOffboardingStatus = (id, status) =>
-  patch(`/documents/offboarding/cases/${id}/status`, { status });
-
-export const getOffboarding = (id) => get(`/documents/offboarding/cases/${id}`);
+// ------------------------
+// Upload
+// ------------------------
+export const uploadDoc = (formData) =>
+  post("/documents/upload", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });

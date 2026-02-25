@@ -1,14 +1,16 @@
-// src/pages/documents/OffboardingPage.js
+// frontend/src/pages/documents/OffboardingPage.js
 import React, { useEffect, useMemo, useState } from "react";
-import { get, post } from "../../lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
 import { toast } from "sonner";
 import { Users, Plus, Rocket, DownloadCloud, ListChecks } from "lucide-react";
+
 import TemplatePicker from "../../components/documents/TemplatePicker";
 import WorkflowStepper from "../../components/documents/WorkflowStepper";
 import Checklist from "../../components/documents/Checklist";
+
+import { listOffboarding, startOffboarding } from "../../lib/documentsApi";
 
 const STEPS = [
   { key: "letter", label: "Lettre de sortie" },
@@ -32,7 +34,9 @@ export default function OffboardingPage() {
     email: "",
     reason: "",
   });
+
   const [selectedTemplates, setSelectedTemplates] = useState([]);
+
   const [checklist, setChecklist] = useState([
     { key: "badge", label: "Restitution badge", done: false },
     { key: "laptop", label: "Restitution laptop", done: false },
@@ -45,8 +49,8 @@ export default function OffboardingPage() {
     setLoading(true);
     setErr("");
     try {
-      const res = await get("/documents/offboarding/cases?status=open");
-      setCases(Array.isArray(res) ? res : res?.items || []);
+      const res = await listOffboarding({ status: "open" });
+      setCases(res?.items || []);
     } catch (e) {
       setErr(e?.message || "Erreur chargement des dossiers");
       setCases([]);
@@ -55,9 +59,11 @@ export default function OffboardingPage() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
-  const startOffboarding = async () => {
+  const start = async () => {
     if (!employee.firstName || !employee.lastName || !employee.email) {
       toast.error("Renseignez nom, prénom, email");
       return;
@@ -66,26 +72,29 @@ export default function OffboardingPage() {
       toast.error("Sélectionnez au moins un modèle");
       return;
     }
+
     setCreating(true);
     try {
       const payload = {
         employee,
         templates: selectedTemplates,
-        checklist: checklist.map(({ key, done }) => ({ key, done })),
+        checklist: checklist.map(({ key, done, label }) => ({
+          key,
+          done,
+          ...(label ? { label } : {}),
+        })),
       };
-      await post("/documents/offboarding/start", payload);
-      toast.success("Dossier d’offboarding créé");
 
-      // événements pour la sidebar / compteurs
+      await startOffboarding(payload);
+
+      toast.success("Dossier d’offboarding créé");
       window.dispatchEvent(new Event("app:counters:refresh"));
       window.dispatchEvent(new Event("documents:changed"));
 
-      // reset formulaire
       setEmployee({ firstName: "", lastName: "", email: "", reason: "" });
       setSelectedTemplates([]);
       setChecklist((prev) => prev.map((i) => ({ ...i, done: false })));
 
-      // rechargement
       await load();
     } catch (e) {
       toast.error(e?.message || "Échec création");
@@ -116,26 +125,24 @@ export default function OffboardingPage() {
         </div>
       </div>
 
-      {/* Bandeau infos pays */}
       <Card>
         <CardContent className="p-4 text-sm text-gray-700">
           <div className="flex items-center gap-2">
             <ListChecks className="w-4 h-4" />
             <span>
-              Lettrage (démission/rupture), workflow d’approbations, solde de
-              tout compte, restitutions (QR), déclarations IPRES/CSS, certificats.
+              Lettrage, workflow d’approbations, solde de tout compte, restitutions, déclarations IPRES/CSS, certificats.
             </span>
           </div>
         </CardContent>
       </Card>
 
-      {/* Création d’un dossier */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Rocket className="w-5 h-5" /> Démarrer un offboarding
           </CardTitle>
         </CardHeader>
+
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             <div>
@@ -143,9 +150,7 @@ export default function OffboardingPage() {
               <input
                 className="w-full mt-1 border rounded-lg px-3 py-2"
                 value={employee.firstName}
-                onChange={(e) =>
-                  setEmployee((s) => ({ ...s, firstName: e.target.value }))
-                }
+                onChange={(e) => setEmployee((s) => ({ ...s, firstName: e.target.value }))}
               />
             </div>
             <div>
@@ -153,9 +158,7 @@ export default function OffboardingPage() {
               <input
                 className="w-full mt-1 border rounded-lg px-3 py-2"
                 value={employee.lastName}
-                onChange={(e) =>
-                  setEmployee((s) => ({ ...s, lastName: e.target.value }))
-                }
+                onChange={(e) => setEmployee((s) => ({ ...s, lastName: e.target.value }))}
               />
             </div>
             <div>
@@ -164,9 +167,7 @@ export default function OffboardingPage() {
                 className="w-full mt-1 border rounded-lg px-3 py-2"
                 type="email"
                 value={employee.email}
-                onChange={(e) =>
-                  setEmployee((s) => ({ ...s, email: e.target.value }))
-                }
+                onChange={(e) => setEmployee((s) => ({ ...s, email: e.target.value }))}
               />
             </div>
             <div>
@@ -174,49 +175,33 @@ export default function OffboardingPage() {
               <input
                 className="w-full mt-1 border rounded-lg px-3 py-2"
                 value={employee.reason}
-                onChange={(e) =>
-                  setEmployee((s) => ({ ...s, reason: e.target.value }))
-                }
+                onChange={(e) => setEmployee((s) => ({ ...s, reason: e.target.value }))}
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <div className="text-sm font-medium text-gray-700">
-              Modèles de documents
-            </div>
-            <TemplatePicker
-              scope="offboarding"
-              value={selectedTemplates}
-              onChange={setSelectedTemplates}
-            />
+            <div className="text-sm font-medium text-gray-700">Modèles de documents</div>
+            <TemplatePicker scope="offboarding" value={selectedTemplates} onChange={setSelectedTemplates} />
           </div>
 
-          <Checklist
-            title="Check-out multi-départements"
-            items={checklist}
-            onToggle={toggleChecklist}
-          />
+          <Checklist title="Check-out multi-départements" items={checklist} onToggle={toggleChecklist} />
 
           <div className="flex justify-end">
-            <Button
-              onClick={startOffboarding}
-              disabled={creating}
-              className="bg-emerald-600 hover:bg-emerald-700"
-            >
+            <Button onClick={start} disabled={creating} className="bg-emerald-600 hover:bg-emerald-700">
               <Plus className="w-4 h-4 mr-2" /> Créer le dossier
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Dossiers en cours */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Users className="w-5 h-5" /> Dossiers ouverts
           </CardTitle>
         </CardHeader>
+
         <CardContent>
           {loading ? (
             <p className="text-sm text-gray-500">Chargement…</p>
@@ -225,15 +210,9 @@ export default function OffboardingPage() {
           ) : offboardingOpen.length ? (
             <div className="space-y-3">
               {offboardingOpen.map((c) => {
-                const idx = Math.max(
-                  0,
-                  STEPS.findIndex((s) => s.key === c.currentStep)
-                );
+                const idx = Math.max(0, STEPS.findIndex((s) => s.key === c.currentStep));
                 return (
-                  <div
-                    key={c.id}
-                    className="border rounded-lg p-4 hover:shadow-sm"
-                  >
+                  <div key={c.id} className="border rounded-lg p-4 hover:shadow-sm">
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="font-semibold">
@@ -248,10 +227,7 @@ export default function OffboardingPage() {
                       </Badge>
                     </div>
                     <div className="mt-3">
-                      <WorkflowStepper
-                        steps={STEPS}
-                        current={idx < 0 ? 0 : idx}
-                      />
+                      <WorkflowStepper steps={STEPS} current={idx < 0 ? 0 : idx} />
                     </div>
                   </div>
                 );

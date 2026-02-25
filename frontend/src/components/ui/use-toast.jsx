@@ -2,14 +2,6 @@
 import * as React from "react";
 import PropTypes from "prop-types";
 
-/**
- * Contexte + Provider
- * - IDs forts (crypto)
- * - auto-dismiss avec nettoyage des timeouts
- * - remove() public et safe
- * - valeur par défaut typée correctement
- */
-
 const noop = () => {};
 const ToastContext = React.createContext({
   toasts: [],
@@ -19,7 +11,6 @@ const ToastContext = React.createContext({
 
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = React.useState([]);
-  // stocke les timeouts pour cleanup
   const timersRef = React.useRef(new Map());
 
   const push = React.useCallback(
@@ -40,7 +31,6 @@ export function ToastProvider({ children }) {
   );
 
   const remove = React.useCallback((id) => {
-    // supprime le toast et nettoie son timer s’il existe
     setToasts((t) => t.filter((x) => x.id !== id));
     const timer = timersRef.current.get(id);
     if (timer) {
@@ -49,7 +39,6 @@ export function ToastProvider({ children }) {
     }
   }, []);
 
-  // cleanup à l’unmount
   React.useEffect(() => {
     return () => {
       timersRef.current.forEach((timer) => clearTimeout(timer));
@@ -62,10 +51,10 @@ export function ToastProvider({ children }) {
   return <ToastContext.Provider value={value}>{children}</ToastContext.Provider>;
 }
 
-/**
- * Hook d’usage (style shadcn)
- * - expose toast(), remove(), toasts
- */
+ToastProvider.propTypes = {
+  children: PropTypes.node,
+};
+
 export function useToast() {
   const ctx = React.useContext(ToastContext);
   if (!ctx) {
@@ -79,17 +68,12 @@ export function useToast() {
   };
 }
 
-/**
- * Helper “toast” sans hook (bridge CustomEvent)
- * - safe côté SSR
- */
 export const toast = (opts = {}) => {
   if (typeof window === "undefined") return;
   try {
     const ev = new CustomEvent("app:toast", { detail: opts });
     window.dispatchEvent(ev);
   } catch {
-    // Fallback très ancien navigateur
     const ev = document.createEvent?.("CustomEvent");
     if (ev?.initCustomEvent) {
       ev.initCustomEvent("app:toast", true, true, opts);
@@ -98,10 +82,6 @@ export const toast = (opts = {}) => {
   }
 };
 
-/**
- * Abonnement pour un composant <Toaster />
- * - retourne une fonction de désabonnement
- */
 export function _subscribeToasts(cb) {
   const handler = (e) => cb(e.detail);
   if (typeof window !== "undefined") {
@@ -111,7 +91,6 @@ export function _subscribeToasts(cb) {
   return () => {};
 }
 
-// Export par défaut conservé pour compat
 export default ToastContext;
 
 /* Utils */
@@ -120,6 +99,6 @@ function cryptoRandomId() {
     const b = new Uint32Array(2);
     crypto.getRandomValues(b);
     return b[0].toString(36) + b[1].toString(36);
-    }
+  }
   return Math.random().toString(36).slice(2);
 }

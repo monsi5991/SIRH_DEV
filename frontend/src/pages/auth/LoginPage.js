@@ -1,31 +1,32 @@
 // frontend/src/pages/auth/LoginPage.js
-import React, { useState } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { User, Lock, Building2, Eye, EyeOff, ArrowRight, UserCheck } from 'lucide-react';
-import { Card, CardContent, CardHeader } from '../../components/ui/card';
-import { Button } from '../../components/ui/button';
-import { Badge } from '../../components/ui/badge';
-import { Tabs, TabsList, TabsTrigger } from '../../components/ui/tabs';
+import React, { useEffect, useMemo, useState } from "react";
+import { useAuth } from "../../contexts/AuthContext";
+import { useLocation, useNavigate } from "react-router-dom";
+import { User, Building2, ArrowRight, UserCheck, Info } from "lucide-react";
+
+import { Card, CardContent, CardHeader } from "../../components/ui/card";
+import { Button } from "../../components/ui/button";
+import { Badge } from "../../components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "../../components/ui/tabs";
 
 const LoginPage = () => {
-  const { login, authLoading } = useAuth();
-  const [showPassword, setShowPassword] = useState(false);
-  const [activeTab, setActiveTab] = useState('rh');
-  const [credentials, setCredentials] = useState({ email: '', password: '' });
+  const { login, loading, isAuthenticated } = useAuth();
+  const [activeTab, setActiveTab] = useState("rh");
 
   const navigate = useNavigate();
   const location = useLocation();
-  const from = location.state?.from?.pathname || '/';
+  const from = useMemo(() => location.state?.from?.pathname || "/", [location.state]);
+
+  // ✅ Si déjà connecté => rediriger là où on voulait aller
+  useEffect(() => {
+    if (!loading && isAuthenticated) {
+      navigate(from, { replace: true });
+    }
+  }, [loading, isAuthenticated, from, navigate]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    const { success, error } = await login(credentials.email, credentials.password);
-    if (success) {
-      navigate(from, { replace: true });
-    } else {
-      window.alert(error || 'Identifiants incorrects');
-    }
+    await login(); // redirige Keycloak
   };
 
   return (
@@ -58,56 +59,45 @@ const LoginPage = () => {
 
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-4">
-              {/* Email */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Adresse email</label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    type="email"
-                    value={credentials.email}
-                    onChange={(e) => setCredentials({ ...credentials, email: e.target.value })}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                    placeholder="votre@email.com"
-                    required
-                  />
+              <div className="p-4 rounded-lg border border-gray-200 bg-white/60 text-sm text-gray-700">
+                {activeTab === "rh" ? (
+                  <p>
+                    Connexion <b>RH / Manager</b> via Keycloak.
+                    <br />
+                    Cliquez sur <b>Se connecter</b> pour ouvrir l’authentification.
+                  </p>
+                ) : (
+                  <p>
+                    Connexion <b>Employé</b> via Keycloak.
+                    <br />
+                    Cliquez sur <b>Se connecter</b> pour ouvrir l’authentification.
+                  </p>
+                )}
+
+                <div className="mt-3 flex items-start gap-2 text-xs text-gray-600">
+                  <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                  <div>
+                    {loading ? (
+                      <span>Vérification de session en cours…</span>
+                    ) : isAuthenticated ? (
+                      <span>Session active détectée. Redirection…</span>
+                    ) : (
+                      <span>Aucune session active. Vous devez vous authentifier.</span>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* Mot de passe */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Mot de passe</label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={credentials.password}
-                    onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
-                    className="w-full pl-10 pr-12 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                    placeholder="••••••••"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Bouton */}
               <Button
                 type="submit"
                 className="w-full bg-emerald-600 hover:bg-emerald-700"
                 size="lg"
-                disabled={authLoading}
+                disabled={loading}
               >
-                {authLoading ? (
+                {loading ? (
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Connexion...
+                    Vérification...
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
@@ -116,6 +106,10 @@ const LoginPage = () => {
                   </div>
                 )}
               </Button>
+
+              <div className="text-xs text-gray-500 text-center">
+                Si rien ne se passe, vérifiez que Keycloak est accessible (8080) puis réessayez.
+              </div>
             </form>
           </CardContent>
         </Card>

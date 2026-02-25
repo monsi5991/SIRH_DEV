@@ -9,7 +9,9 @@ const AppContext = createContext(null);
 export const useApp = () => useContext(AppContext);
 
 export const AppProvider = ({ children }) => {
-  const { isAuthenticated } = useAuth(); // on le garde si d’autres parties l’utilisent
+  // ✅ évite le crash si jamais useAuth est appelé hors provider
+  const auth = useAuth();
+  const isAuthenticated = !!auth?.isAuthenticated;
 
   // --- i18n (FR uniquement)
   const t = (key, params = {}) => {
@@ -81,20 +83,17 @@ export const AppProvider = ({ children }) => {
   const abortRef = useRef(null);
 
   const refreshValidationCounts = React.useCallback(async () => {
-    // annule l’appel précédent si toujours en vol
     if (abortRef.current) abortRef.current.abort();
     const controller = new AbortController();
     abortRef.current = controller;
 
     try {
-      // route publique côté backend (démo)
       const s = await get("/dashboard/summary", { signal: controller.signal });
       const p = s?.pendingValidations || {};
       const leaves = p.leaves || 0;
       const timesheets = p.timesheets || 0;
       const expenses = p.expenses || 0;
 
-      // évènements du jour si fournis
       const today = new Date();
       const yyyy = today.getFullYear();
       const mm = String(today.getMonth() + 1).padStart(2, "0");
@@ -105,27 +104,23 @@ export const AppProvider = ({ children }) => {
       if (Array.isArray(s?.upcomingEvents)) {
         eventsToday = s.upcomingEvents.filter((e) => {
           const d = new Date(e.date);
-          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+            d.getDate()
+          ).padStart(2, "0")}`;
           return key === todayKey;
         }).length;
       }
 
       setValidationCounts({ leaves, timesheets, expenses, eventsToday });
     } catch (e) {
-      // 🔇 ignore les erreurs “normales” pour ne pas casser l’UI
       if (e?.name === "AbortError") return;
-      if (e?.status === 401) return;                // pas connecté / jeton manquant → on garde les compteurs à 0
-      if (e?.message === "Network error") return;   // backend down / cors / réseau → silencieux
-      // autres erreurs: log discret
       console.debug("refreshValidationCounts error:", e);
     } finally {
-      // libère le controller si c’est le nôtre
       if (abortRef.current === controller) abortRef.current = null;
     }
   }, []);
 
   useEffect(() => {
-    // on lance au montage (même si pas authentifié, la route est publique)
     refreshValidationCounts();
     const h = () => refreshValidationCounts();
     window.addEventListener("app:counters:refresh", h);
@@ -146,9 +141,9 @@ export const AppProvider = ({ children }) => {
       isFeatureLocked,
       validationCounts,
       refreshValidationCounts,
-      isAuthenticated, // dispo si d’autres composants en ont besoin
+      isAuthenticated,
     }),
-    [currentPlan, validationCounts, isAuthenticated, t]
+    [currentPlan, validationCounts, isAuthenticated]
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

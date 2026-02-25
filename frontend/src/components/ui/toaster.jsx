@@ -1,5 +1,7 @@
 // src/components/ui/toaster.jsx
 import * as React from "react";
+import PropTypes from "prop-types";
+
 import {
   ToastProvider as RadixProvider,
   ToastViewport,
@@ -9,7 +11,6 @@ import {
   ToastClose,
 } from "./toast";
 import { ToastProvider as AppToastProvider, useToast, _subscribeToasts } from "./use-toast";
-import PropTypes from "prop-types";
 
 /**
  * <BridgeSubscriber />
@@ -54,11 +55,9 @@ function ToastList({ closeButton, position }) {
       {toasts.map((t) => (
         <Toast
           key={t.id}
-          // onOpenChange est déclenché quand l’utilisateur ferme le toast (clic/gesture).
           onOpenChange={(open) => {
             if (!open) remove(t.id);
           }}
-          // data-variant pour tes styles conditionnels Tailwind/CSS si besoin
           data-variant={t.variant ?? "default"}
           className="group"
         >
@@ -67,20 +66,19 @@ function ToastList({ closeButton, position }) {
           {closeButton !== false && <ToastClose />}
         </Toast>
       ))}
-      {/* Positionnement du viewport */}
+
       <ToastViewport className={viewportPositionClass(position)} />
     </>
   );
 }
 
+ToastList.propTypes = {
+  closeButton: PropTypes.bool,
+  position: PropTypes.string,
+};
+
 /**
  * Toaster
- * Props similaires à ton ancien composant:
- * - theme: "light" | "dark" | "system" (utilisé comme data-theme pour tes styles)
- * - position: "top-right" | "top-left" | "bottom-right" | "bottom-left" | "top-center" | "bottom-center"
- * - swipeDirection: "right" | "left" | "up" | "down" (Radix)
- * - closeButton: bool (afficher le bouton de fermeture)
- * - defaultDuration: durée par défaut pour Radix (les auto-dismiss viennent déjà du provider custom)
  */
 export function Toaster({
   theme = "system",
@@ -89,11 +87,10 @@ export function Toaster({
   closeButton = true,
   defaultDuration = 3200,
 }) {
-  // Résolution du thème system -> data-theme (tes styles peuvent cibler [data-theme="dark"])
   const resolvedTheme =
     theme === "system"
       ? (typeof window !== "undefined" &&
-         window.matchMedia?.("(prefers-color-scheme: dark)")?.matches
+        window.matchMedia?.("(prefers-color-scheme: dark)")?.matches
           ? "dark"
           : "light")
       : theme;
@@ -109,5 +106,13 @@ export function Toaster({
     </AppToastProvider>
   );
 }
+
+Toaster.propTypes = {
+  theme: PropTypes.string,
+  position: PropTypes.string,
+  swipeDirection: PropTypes.string,
+  closeButton: PropTypes.bool,
+  defaultDuration: PropTypes.number,
+};
 
 export default Toaster;

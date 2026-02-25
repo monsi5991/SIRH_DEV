@@ -1,13 +1,11 @@
-// backend/src/routes/operations/expenses.js
 import express from "express";
 import { prisma } from "../../prisma.js";
-import { verifyAccess } from "../../auth.js";
 import { requirePermissions } from "../../rbac.js";
 
 const router = express.Router();
 
-// Lecture = droit read pour toutes les routes ci-dessous
-router.use(verifyAccess, requirePermissions(["operations_read"], "anyOf"));
+// ✅ index.js a déjà fait verifyKeycloak + attachDbAuthFromKeycloak
+router.use(requirePermissions(["operations_read"], "anyOf"));
 
 // --- Helpers ---
 const ALLOWED_TAX_TREATMENTS = new Set(["REIMBURSEMENT", "TAXABLE", "MIXED"]);
@@ -20,7 +18,6 @@ function toDateSafe(v) {
 }
 function normalizeCurrency(c) {
   const code = String(c || DEFAULT_CURRENCY).toUpperCase();
-  // Optionnel: filtrage simple sur 3 lettres
   return /^[A-Z]{3}$/.test(code) ? code : DEFAULT_CURRENCY;
 }
 function normalizeTax(t) {
@@ -35,6 +32,8 @@ function normalizeTax(t) {
 router.get("/", async (req, res) => {
   try {
     const tid = req.auth?.tid;
+    if (!tid) return res.status(401).json({ error: "Unauthorized" });
+
     const { status } = req.query;
 
     const where = { tenantId: tid };
@@ -54,8 +53,7 @@ router.get("/", async (req, res) => {
         amount: true,
         currency: true,
         status: true,
-        // ✅ champ paie
-        taxTreatment: true, // "REIMBURSEMENT" | "TAXABLE" | "MIXED"
+        taxTreatment: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -69,125 +67,97 @@ router.get("/", async (req, res) => {
 
 // ------------------------------------
 // POST /operations/expenses
-// body: { employee?, employeeId?, date, category, amount, currency?, status?, taxTreatment? }
 // ------------------------------------
-router.post(
-  "/",
-  requirePermissions(["operations_write"], "anyOf"),
-  async (req, res) => {
-    try {
-      const tid = req.auth?.tid;
-      const {
-        employee,
-        employeeId,
-        date,
-        category,
-        amount,
-        currency,
-        status,
-        taxTreatment,
-      } = req.body || {};
+router.post("/", requirePermissions(["operations_write"], "anyOf"), async (req, res) => {
+  try {
+    const tid = req.auth?.tid;
+    if (!tid) return res.status(401).json({ error: "Unauthorized" });
 
-      // Au moins employee OU employeeId
-      if ((!employee && !employeeId) || !date || !category || amount == null) {
-        return res
-          .status(400)
-          .json({ error: "employee/employeeId, date, category, amount requis" });
-      }
+    const { employee, employeeId, date, category, amount, currency, status, taxTreatment } = req.body || {};
 
-      const d = toDateSafe(date);
-      if (!d) return res.status(400).json({ error: "date invalide" });
-
-      const numAmount = Number(amount);
-      if (!Number.isFinite(numAmount)) {
-        return res.status(400).json({ error: "amount invalide" });
-      }
-
-      const row = await prisma.expense.create({
-        data: {
-          tenantId: tid,
-          employee: employee ? String(employee) : null,
-          employeeId: employeeId || null,
-          date: d,
-          category: String(category),
-          amount: numAmount,
-          currency: normalizeCurrency(currency),
-          status: status || DEFAULT_STATUS,
-          // ✅ champ paie
-          taxTreatment: normalizeTax(taxTreatment),
-        },
-      });
-
-      res.status(201).json(row);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
+    if ((!employee && !employeeId) || !date || !category || amount == null) {
+      return res.status(400).json({ error: "employee/employeeId, date, category, amount requis" });
     }
+
+    const d = toDateSafe(date);
+    if (!d) return res.status(400).json({ error: "date invalide" });
+
+    const numAmount = Number(amount);
+    if (!Number.isFinite(numAmount)) return res.status(400).json({ error: "amount invalide" });
+
+    const row = await prisma.expense.create({
+      data: {
+        tenantId: tid,
+        employee: employee ? String(employee) : null,
+        employeeId: employeeId || null,
+        date: d,
+        category: String(category),
+        amount: numAmount,
+        currency: normalizeCurrency(currency),
+        status: status || DEFAULT_STATUS,
+        taxTreatment: normalizeTax(taxTreatment),
+      },
+    });
+
+    res.status(201).json(row);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
-);
+});
 
 // ------------------------------------
 // PUT /operations/expenses/:id
-// body: { status?, taxTreatment? }
-// (on conserve ton endpoint /:id, pas /:id/status)
 // ------------------------------------
-router.put(
-  "/:id",
-  requirePermissions(["operations_write"], "anyOf"),
-  async (req, res) => {
-    try {
-      const tid = req.auth?.tid;
-      const { id } = req.params;
-      const { status, taxTreatment } = req.body || {};
+router.put("/:id", requirePermissions(["operations_write"], "anyOf"), async (req, res) => {
+  try {
+    const tid = req.auth?.tid;
+    if (!tid) return res.status(401).json({ error: "Unauthorized" });
 
-      const found = await prisma.expense.findFirst({
-        where: { id, tenantId: tid },
-        select: { id: true },
-      });
-      if (!found) return res.status(404).json({ error: "Note de frais introuvable" });
+    const { id } = req.params;
+    const { status, taxTreatment } = req.body || {};
 
-      const data = {};
-      if ("status" in req.body) {
-        data.status = status == null ? null : String(status);
-      }
-      if ("taxTreatment" in req.body) {
-        data.taxTreatment = normalizeTax(taxTreatment);
-      }
+    const found = await prisma.expense.findFirst({
+      where: { id, tenantId: tid },
+      select: { id: true },
+    });
+    if (!found) return res.status(404).json({ error: "Note de frais introuvable" });
 
-      const row = await prisma.expense.update({
-        where: { id },
-        data,
-      });
+    const data = {};
+    if ("status" in (req.body || {})) data.status = status == null ? null : String(status);
+    if ("taxTreatment" in (req.body || {})) data.taxTreatment = normalizeTax(taxTreatment);
 
-      res.json(row);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
+    const row = await prisma.expense.update({
+      where: { id },
+      data,
+    });
+
+    res.json(row);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
-);
+});
 
 // ------------------------------------
 // DELETE /operations/expenses/:id
 // ------------------------------------
-router.delete(
-  "/:id",
-  requirePermissions(["operations_write"], "anyOf"),
-  async (req, res) => {
-    try {
-      const tid = req.auth?.tid;
-      const { id } = req.params;
+router.delete("/:id", requirePermissions(["operations_write"], "anyOf"), async (req, res) => {
+  try {
+    const tid = req.auth?.tid;
+    if (!tid) return res.status(401).json({ error: "Unauthorized" });
 
-      const found = await prisma.expense.findFirst({
-        where: { id, tenantId: tid },
-        select: { id: true },
-      });
-      if (!found) return res.status(404).json({ error: "Note de frais introuvable" });
+    const { id } = req.params;
 
-      await prisma.expense.delete({ where: { id } });
-      res.json({ ok: true });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
+    const found = await prisma.expense.findFirst({
+      where: { id, tenantId: tid },
+      select: { id: true },
+    });
+    if (!found) return res.status(404).json({ error: "Note de frais introuvable" });
+
+    await prisma.expense.delete({ where: { id } });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
-);
+});
 
 export default router;
