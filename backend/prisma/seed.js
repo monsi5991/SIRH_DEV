@@ -52,7 +52,20 @@ async function main() {
   }
 
   // ---------- Permissions / Roles ----------
-  const permNames = ["all", "directory_read", "operations_read", "operations_write"];
+  const permNames = [
+    "all",
+    "directory_read",
+    "operations_read",
+    "operations_write",
+    "self_read",
+    "self_write",
+    "team_read",
+    "team_write",
+    "approvals_read",
+    "approvals_write",
+    "analytics_read",
+    "admin_read",
+  ];
   const perms = {};
   for (const p of permNames) perms[p] = await upsertPermission(p, tenant.id);
 
@@ -73,11 +86,20 @@ async function main() {
       { roleId: roleManager.id,  permissionId: perms["operations_read"].id },
       { roleId: roleManager.id,  permissionId: perms["operations_write"].id },
       { roleId: roleManager.id,  permissionId: perms["directory_read"].id },
+      { roleId: roleManager.id,  permissionId: perms["team_read"].id },
+      { roleId: roleManager.id,  permissionId: perms["team_write"].id },
+      { roleId: roleManager.id,  permissionId: perms["approvals_read"].id },
+      { roleId: roleManager.id,  permissionId: perms["approvals_write"].id },
+      { roleId: roleManager.id,  permissionId: perms["self_read"].id },
     ],
     skipDuplicates: true,
   });
   await prisma.rolePermission.createMany({
-    data: [{ roleId: roleEmployee.id, permissionId: perms["directory_read"].id }],
+    data: [
+      { roleId: roleEmployee.id, permissionId: perms["directory_read"].id },
+      { roleId: roleEmployee.id, permissionId: perms["self_read"].id },
+      { roleId: roleEmployee.id, permissionId: perms["self_write"].id },
+    ],
     skipDuplicates: true,
   });
 
