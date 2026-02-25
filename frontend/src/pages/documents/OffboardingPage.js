@@ -9,6 +9,8 @@ import { Users, Plus, Rocket, DownloadCloud, ListChecks } from "lucide-react";
 import TemplatePicker from "../../components/documents/TemplatePicker";
 import WorkflowStepper from "../../components/documents/WorkflowStepper";
 import Checklist from "../../components/documents/Checklist";
+import EmployeeIdentityForm from "../../components/documents/EmployeeIdentityForm";
+import { z } from "zod";
 
 import { listOffboarding, startOffboarding } from "../../lib/documentsApi";
 
@@ -32,6 +34,7 @@ export default function OffboardingPage() {
     firstName: "",
     lastName: "",
     email: "",
+    manager: "",
     reason: "",
   });
 
@@ -63,9 +66,18 @@ export default function OffboardingPage() {
     load();
   }, []);
 
+  const EmployeeSchema = z.object({
+    firstName: z.string().min(2, "Prénom requis"),
+    lastName: z.string().min(2, "Nom requis"),
+    email: z.string().email("Email invalide"),
+    reason: z.string().optional(),
+    manager: z.string().optional(),
+  });
+
   const start = async () => {
-    if (!employee.firstName || !employee.lastName || !employee.email) {
-      toast.error("Renseignez nom, prénom, email");
+    const parsedEmployee = EmployeeSchema.safeParse(employee);
+    if (!parsedEmployee.success) {
+      toast.error(parsedEmployee.error.issues[0]?.message || "Formulaire employé invalide");
       return;
     }
     if (!selectedTemplates.length) {
@@ -91,7 +103,7 @@ export default function OffboardingPage() {
       window.dispatchEvent(new Event("app:counters:refresh"));
       window.dispatchEvent(new Event("documents:changed"));
 
-      setEmployee({ firstName: "", lastName: "", email: "", reason: "" });
+      setEmployee({ firstName: "", lastName: "", email: "", manager: "", reason: "" });
       setSelectedTemplates([]);
       setChecklist((prev) => prev.map((i) => ({ ...i, done: false })));
 
@@ -144,41 +156,7 @@ export default function OffboardingPage() {
         </CardHeader>
 
         <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <div>
-              <label className="text-sm text-gray-600">Prénom *</label>
-              <input
-                className="w-full mt-1 border rounded-lg px-3 py-2"
-                value={employee.firstName}
-                onChange={(e) => setEmployee((s) => ({ ...s, firstName: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className="text-sm text-gray-600">Nom *</label>
-              <input
-                className="w-full mt-1 border rounded-lg px-3 py-2"
-                value={employee.lastName}
-                onChange={(e) => setEmployee((s) => ({ ...s, lastName: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className="text-sm text-gray-600">Email *</label>
-              <input
-                className="w-full mt-1 border rounded-lg px-3 py-2"
-                type="email"
-                value={employee.email}
-                onChange={(e) => setEmployee((s) => ({ ...s, email: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className="text-sm text-gray-600">Motif</label>
-              <input
-                className="w-full mt-1 border rounded-lg px-3 py-2"
-                value={employee.reason}
-                onChange={(e) => setEmployee((s) => ({ ...s, reason: e.target.value }))}
-              />
-            </div>
-          </div>
+          <EmployeeIdentityForm employee={employee} setEmployee={setEmployee} extraField={{ key: "reason", label: "Motif" }} />
 
           <div className="space-y-2">
             <div className="text-sm font-medium text-gray-700">Modèles de documents</div>
