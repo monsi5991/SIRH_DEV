@@ -36,6 +36,22 @@ import OffboardingPage from "./pages/documents/OffboardingPage";
 // Resources
 import CompliancePage from "./pages/resources/CompliancePage";
 import PoliciesPage from "./pages/resources/PoliciesPage";
+import AnalyticsReportsPage from "./pages/analytics/AnalyticsReportsPage";
+import AnalyticsDashboardsPage from "./pages/analytics/AnalyticsDashboardsPage";
+import AdminStructurePage from "./pages/admin/AdminStructurePage";
+import AdminPermissionsPage from "./pages/admin/AdminPermissionsPage";
+import AdminIntegrationsPage from "./pages/admin/AdminIntegrationsPage";
+import ManagerDashboardPage from "./pages/manager/ManagerDashboardPage";
+import TeamApprovalsPage from "./pages/manager/TeamApprovalsPage";
+import ManagerTeamOverviewPage from "./pages/manager/ManagerTeamOverviewPage";
+import ManagerPerformancePage from "./pages/manager/ManagerPerformancePage";
+import EmployeeDashboardPage from "./pages/employee/EmployeeDashboardPage";
+import EmployeeProfilePage from "./pages/employee/EmployeeProfilePage";
+import EmployeeRequestsPage from "./pages/employee/EmployeeRequestsPage";
+import EmployeeDocumentsPage from "./pages/employee/EmployeeDocumentsPage";
+import MyPayslipsPage from "./pages/employee/MyPayslipsPage";
+import HrWorkforcePlanningPage from "./pages/hr/HrWorkforcePlanningPage";
+import HrStrategicReviewsPage from "./pages/hr/HrStrategicReviewsPage";
 
 // RH (optionnel)
 import EmployeeListPage from "./pages/employee/EmployeeListPage";
@@ -89,6 +105,7 @@ function RequireAuthLayout() {
  * - Pas besoin de mettre "all" partout : hasPermissions gère déjà "all"
  * ========================= */
 const Perm = (props) => <ProtectedRoute {...props} enforce="perm" />;
+const RolePerm = (props) => <ProtectedRoute {...props} enforce="both" />;
 /* Usage: <Perm requiredPermissions={["operations_read"]}><Page/></Perm> */
 
 /* =========================
@@ -193,6 +210,144 @@ function AppRoutes() {
             <Perm requiredPermissions={["directory_read"]}>
               <PoliciesPage />
             </Perm>
+          }
+        />
+
+        {/* Analytics */}
+        <Route
+          path="analytics/reports"
+          element={
+            <Perm requiredPermissions={["analytics_read"]}>
+              <AnalyticsReportsPage />
+            </Perm>
+          }
+        />
+        <Route
+          path="analytics/dashboards"
+          element={
+            <Perm requiredPermissions={["analytics_read"]}>
+              <AnalyticsDashboardsPage />
+            </Perm>
+          }
+        />
+
+        {/* Admin */}
+        <Route
+          path="admin/structure"
+          element={
+            <Perm requiredPermissions={["admin_read"]}>
+              <AdminStructurePage />
+            </Perm>
+          }
+        />
+        <Route
+          path="admin/permissions"
+          element={
+            <Perm requiredPermissions={["admin_read"]}>
+              <AdminPermissionsPage />
+            </Perm>
+          }
+        />
+        <Route
+          path="admin/integrations"
+          element={
+            <Perm requiredPermissions={["admin_read"]}>
+              <AdminIntegrationsPage />
+            </Perm>
+          }
+        />
+
+        {/* Manager */}
+        <Route
+          path="manager/dashboard"
+          element={
+            <RolePerm requiredRole="Manager" requiredPermissions={["team_read"]}>
+              <ManagerDashboardPage />
+            </RolePerm>
+          }
+        />
+        <Route
+          path="manager/team-overview"
+          element={
+            <RolePerm requiredRole="Manager" requiredPermissions={["team_read"]}>
+              <ManagerTeamOverviewPage />
+            </RolePerm>
+          }
+        />
+        <Route
+          path="manager/approvals"
+          element={
+            <RolePerm requiredRole="Manager" requiredPermissions={["approvals_read"]}>
+              <TeamApprovalsPage />
+            </RolePerm>
+          }
+        />
+        <Route
+          path="manager/performance"
+          element={
+            <RolePerm requiredRole="Manager" requiredPermissions={["team_read"]}>
+              <ManagerPerformancePage />
+            </RolePerm>
+          }
+        />
+
+        {/* Employee self-service */}
+        <Route
+          path="employee/dashboard"
+          element={
+            <RolePerm requiredRole="Employee" requiredPermissions={["self_read"]}>
+              <EmployeeDashboardPage />
+            </RolePerm>
+          }
+        />
+        <Route
+          path="employee/requests"
+          element={
+            <RolePerm requiredRole="Employee" requiredPermissions={["self_read"]}>
+              <EmployeeRequestsPage />
+            </RolePerm>
+          }
+        />
+        <Route
+          path="employee/documents"
+          element={
+            <RolePerm requiredRole="Employee" requiredPermissions={["self_read"]}>
+              <EmployeeDocumentsPage />
+            </RolePerm>
+          }
+        />
+        <Route
+          path="employee/profile"
+          element={
+            <RolePerm requiredRole="Employee" requiredPermissions={["self_read"]}>
+              <EmployeeProfilePage />
+            </RolePerm>
+          }
+        />
+        <Route
+          path="me/payslips"
+          element={
+            <RolePerm requiredRole="Employee" requiredPermissions={["self_read"]}>
+              <MyPayslipsPage />
+            </RolePerm>
+          }
+        />
+
+        {/* RH exclusif */}
+        <Route
+          path="hr/workforce-planning"
+          element={
+            <RolePerm requiredRole="RH" requiredPermissions={["directory_read"]}>
+              <HrWorkforcePlanningPage />
+            </RolePerm>
+          }
+        />
+        <Route
+          path="hr/strategic-reviews"
+          element={
+            <RolePerm requiredRole="RH" requiredPermissions={["directory_read"]}>
+              <HrStrategicReviewsPage />
+            </RolePerm>
           }
         />
 
