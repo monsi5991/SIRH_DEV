@@ -10,6 +10,11 @@ import { Badge } from "../../components/ui/badge";
 import { CalendarDays, CheckCircle, XCircle, Eye, Plus, Trash2 } from "lucide-react";
 import TimesheetFormDialog from "../../components/operations/TimesheetFormDialog";
 import { kpiStart, kpiSuccess, kpiError } from "../../lib/kpiTracker";
+import PageHeader from "../../components/common/PageHeader";
+import SectionCard from "../../components/common/SectionCard";
+import EmptyState from "../../components/common/EmptyState";
+import HelpTooltip from "../../components/common/HelpTooltip";
+import { IS_DEVELOPMENT } from "../../lib/env";
 
 /* ----------------------------------------------------
  * Helpers
@@ -53,7 +58,6 @@ function DetailPanel({
   const [localRows, setLocalRows] = useState(items || []);
   const [selected, setSelected] = useState(() => new Set());
   const [statusFilter, setStatusFilter] = useState("");
-  const [openCreate, setOpenCreate] = useState(false);
   const [busy, setBusy] = useState(false);
   const panelRef = useRef(null);
 
@@ -357,7 +361,7 @@ export default function TimePage() {
     } catch (e) {
       if (e?.name !== "AbortError") {
         setRows(cacheRef.current.rows.length ? cacheRef.current.rows : []);
-        if (process.env.NODE_ENV !== "production") {
+        if (IS_DEVELOPMENT) {
           console.debug("timesheets: load error", e);
         }
       }
@@ -402,10 +406,25 @@ export default function TimePage() {
         year: Number(ym.slice(0, 4)),
         month: Number(ym.slice(5)),
         totalHours: 0,
+        normalHours: 0,
+        overtime15: 0,
+        overtime40: 0,
+        overtime60: 0,
+        nightHours: 0,
+        sundayHolidayHours: 0,
         counts: { Submitted: 0, Approved: 0, Rejected: 0 },
         items: [],
       };
-      bucket.totalHours += Number(r.hours) || 0;
+      const hours = Number(r.hours) || 0;
+      const premium = Number(r.premium) || 0;
+      const type = String(r.type || "REG").toUpperCase();
+      bucket.totalHours += hours;
+      if (type.includes("NIGHT") || type.includes("NUIT")) bucket.nightHours += hours;
+      else if (type.includes("HOLIDAY") || type.includes("FERIE") || type.includes("SUNDAY") || type.includes("DIM")) bucket.sundayHolidayHours += hours;
+      else if (premium >= 0.6) bucket.overtime60 += hours;
+      else if (premium >= 0.4) bucket.overtime40 += hours;
+      else if (premium >= 0.15) bucket.overtime15 += hours;
+      else bucket.normalHours += hours;
       bucket.counts[r.status] = (bucket.counts[r.status] || 0) + 1;
       bucket.items.push(r);
       map.set(key, bucket);
@@ -414,6 +433,13 @@ export default function TimePage() {
     arr.sort((a, b) => b.year - a.year || b.month - a.month || a.employee.localeCompare(b.employee));
     return arr;
   }, [rows, statusFilter]);
+
+  const summary = useMemo(() => ({
+    rows: aggregates.length,
+    totalHours: aggregates.reduce((acc, row) => acc + row.totalHours, 0),
+    submitted: aggregates.reduce((acc, row) => acc + (row.counts.Submitted || 0), 0),
+    approved: aggregates.reduce((acc, row) => acc + (row.counts.Approved || 0), 0),
+  }), [aggregates]);
 
   const openDetails = (bucket) => {
     setDetailCtx({ employee: bucket.employee, year: bucket.year, month: bucket.month, items: bucket.items });
@@ -459,45 +485,64 @@ export default function TimePage() {
 
   return (
     <div className="p-6 space-y-6 table-page">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Feuilles de temps</h1>
-        <div className="flex items-center gap-2">
-          <select
-            className="border rounded px-2 py-1"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="">Tous statuts</option>
-            <option value="Submitted">Submitted</option>
-            <option value="Approved">Approved</option>
-            <option value="Rejected">Rejected</option>
-          </select>
-          <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => setOpenCreate(true)}>
-            <Plus className="w-4 h-4 mr-2" /> Ajouter
-          </Button>
+      <PageHeader
+        title="Feuilles de temps"
+        description="Saisie, contrôle et validation des heures normales, heures supplémentaires et majorations."
+        actions={(
+          <div className="flex items-center gap-2">
+            <select
+              className="border rounded px-2 py-1"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="">Tous statuts</option>
+              <option value="Submitted">Soumises</option>
+              <option value="Approved">Validées</option>
+              <option value="Rejected">Rejetées</option>
+            </select>
+            <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => setOpenCreate(true)}>
+              <Plus className="w-4 h-4 mr-2" /> Ajouter
+            </Button>
+          </div>
+        )}
+      >
+        <div className="grid grid-cols-1 gap-3 rounded-2xl border border-emerald-100 bg-white p-4 md:grid-cols-4">
+          <div className="rounded-xl border border-slate-200 p-3"><div className="text-xs uppercase tracking-wide text-slate-500">Lignes agrégées</div><div className="mt-2 text-2xl font-bold text-slate-900">{summary.rows}</div></div>
+          <div className="rounded-xl border border-slate-200 p-3"><div className="text-xs uppercase tracking-wide text-slate-500">Heures totales</div><div className="mt-2 text-2xl font-bold text-slate-900">{summary.totalHours.toFixed(1)} h</div></div>
+          <div className="rounded-xl border border-slate-200 p-3"><div className="text-xs uppercase tracking-wide text-slate-500">À valider</div><div className="mt-2 text-2xl font-bold text-amber-700">{summary.submitted}</div></div>
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800"><div className="font-medium">Assistant UX</div><div className="mt-1">Utilisez un modèle par journée puis relisez les majorations avant soumission pour éviter les rejets paie.</div></div>
         </div>
-      </div>
+      </PageHeader>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <SectionCard
+        title={(
+          <span className="inline-flex items-center gap-2">
             <CalendarDays className="w-5 h-5" /> Mois / Heures (agrégé)
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+            <HelpTooltip content="Lecture paie: heures normales, HS 15%, HS 40%, HS 60%, nuit et dimanche/jours fériés. Les lignes détaillées restent accessibles par mois." />
+          </span>
+        )}
+        description="Vue synthèse par employé et par mois avant validation."
+      >
+        {aggregates.length ? (
           <div className="overflow-x-auto">
             <table className="min-w-full border table-fixed">
               <thead>
                 <tr className="bg-gray-50 text-left">
-                  <th className="p-2 border w-56">Employé</th>
-                  <th className="p-2 border w-56">Mois</th>
-                  <th className="p-2 border w-28">Heures</th>
+                  <th className="p-2 border w-44">Employé</th>
+                  <th className="p-2 border w-36">Mois</th>
+                  <th className="p-2 border w-24">Normales</th>
+                  <th className="p-2 border w-24">HS 15%</th>
+                  <th className="p-2 border w-24">HS 40%</th>
+                  <th className="p-2 border w-24">HS 60%</th>
+                  <th className="p-2 border w-24">Nuit</th>
+                  <th className="p-2 border w-28">Dim / fériés</th>
+                  <th className="p-2 border w-24">Total</th>
                   <th className="p-2 border w-56">Statut</th>
                   <th className="p-2 border w-[200px]">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                <tr className="h-0"><td colSpan={5} className="p-0" /></tr>
+                <tr className="h-0"><td colSpan={11} className="p-0" /></tr>
                 {aggregates.map((b) => {
                   const st = b.counts;
                   const statusSummary = (
@@ -518,7 +563,13 @@ export default function TimePage() {
                     <tr key={`${b.employee}|${b.ym}`} className="hover:bg-gray-50">
                       <td className="p-2 border">{b.employee}</td>
                       <td className="p-2 border capitalize">{monthLabelFR(b.year, b.month)}</td>
-                      <td className="p-2 border">{b.totalHours}</td>
+                      <td className="p-2 border">{b.normalHours.toFixed(1)}</td>
+                      <td className="p-2 border">{b.overtime15.toFixed(1)}</td>
+                      <td className="p-2 border">{b.overtime40.toFixed(1)}</td>
+                      <td className="p-2 border">{b.overtime60.toFixed(1)}</td>
+                      <td className="p-2 border">{b.nightHours.toFixed(1)}</td>
+                      <td className="p-2 border">{b.sundayHolidayHours.toFixed(1)}</td>
+                      <td className="p-2 border">{b.totalHours.toFixed(1)}</td>
                       <td className="p-2 border">{statusSummary}</td>
                       <td className="p-2 border">
                         <Button
@@ -535,7 +586,7 @@ export default function TimePage() {
                 })}
                 {!aggregates.length && (
                   <tr>
-                    <td colSpan={5} className="p-6 text-sm text-gray-500">
+                    <td colSpan={11} className="p-6 text-sm text-gray-500">
                       Aucune feuille.
                     </td>
                   </tr>
@@ -543,8 +594,17 @@ export default function TimePage() {
               </tbody>
             </table>
           </div>
-        </CardContent>
-      </Card>
+        ) : (
+          <EmptyState
+            icon={CalendarDays}
+            title="Aucune feuille de temps sur ce filtre"
+            description="Créez une première saisie ou changez le statut sélectionné."
+            actionLabel="Ajouter une ligne"
+            onAction={() => setOpenCreate(true)}
+            compact
+          />
+        )}
+      </SectionCard>
 
       {/* Panneau de détail */}
       {detailCtx && (

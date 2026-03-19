@@ -1,23 +1,5 @@
 import { get, post, put, del } from "./api";
-
-/**
- * Détermination robuste de l’URL API, compatible CRA/Webpack/Vite,
- * sans utiliser `import.meta` (qui posait souci avec Babel).
- */
-function resolveApiBase() {
-  // 1) surcharge à la volée éventuelle
-  if (typeof window !== "undefined" && window.__API_URL__) return window.__API_URL__;
-  // 2) variables d'env (CRA / Webpack / Vite)
-  if (typeof process !== "undefined" && process.env) {
-    if (process.env.REACT_APP_API_URL) return process.env.REACT_APP_API_URL;
-    if (process.env.API_URL) return process.env.API_URL;
-    if (process.env.VITE_API_URL) return process.env.VITE_API_URL;
-  }
-  // 3) fallback dev
-  return "http://localhost:4000";
-}
-
-const API_BASE = resolveApiBase();
+import { API_BASE_URL as API_BASE } from "./env";
 
 /* -------------------------------- Employees -------------------------------- */
 export const fetchEmployees = (params = {}) => {
@@ -41,14 +23,7 @@ export const uploadEmployeeDocument = async (
   if (type) fd.append("type", type);
   if (expiresAt) fd.append("expiresAt", expiresAt);
 
-  const res = await fetch(`${API_BASE}/people/employees/${employeeId}/documents`, {
-    method: "POST",
-    body: fd,
-    credentials: "include",
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data?.message || "Upload failed");
-  return data;
+  return post(`/people/employees/${employeeId}/documents`, fd);
 };
 
 export const deleteDocument = (docId) => del(`/people/documents/${docId}`);
@@ -93,4 +68,4 @@ export const cancelSession     = (id)          =>
 export const markAttendance    = (id, payload = {}) =>
   post(`/training/sessions/${id}/attendance`, payload);
 
-export { API_BASE }; // utile si tu veux réutiliser la valeur ailleurs
+export { API_BASE };

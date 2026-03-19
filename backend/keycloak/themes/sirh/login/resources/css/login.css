@@ -1,0 +1,478 @@
+:root {
+  --sirh-bg-deep: #020b08;
+  --sirh-bg-mid: #03231b;
+  --sirh-bg-glow: #0b8f69;
+  --sirh-panel: rgba(8, 20, 16, 0.68);
+  --sirh-card: rgba(247, 250, 249, 0.93);
+  --sirh-card-border: rgba(148, 163, 184, 0.24);
+  --sirh-text-main: #0f172a;
+  --sirh-text-soft: #475569;
+  --sirh-primary: #059669;
+  --sirh-primary-dark: #047857;
+  --sirh-focus: rgba(16, 185, 129, 0.3);
+  --sirh-radius-md: 16px;
+}
+
+html.login-pf,
+html.login-pf body {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+}
+
+html.login-pf {
+  background: var(--sirh-bg-deep) !important;
+  background-image: none !important;
+}
+
+html.login-pf body {
+  font-family: "Plus Jakarta Sans", "Avenir Next", "Segoe UI", "Noto Sans", sans-serif;
+  background-image: radial-gradient(circle at 9% 14%, rgba(16, 185, 129, 0.2), transparent 34%),
+    radial-gradient(circle at 85% 18%, rgba(20, 184, 166, 0.18), transparent 30%),
+    linear-gradient(132deg, var(--sirh-bg-deep), var(--sirh-bg-mid) 48%, #010608);
+  color: #f0fdf4;
+  overflow-x: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+html.login-pf body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.32;
+  background-image: linear-gradient(120deg, rgba(255, 255, 255, 0.07) 0, transparent 10%),
+    repeating-linear-gradient(
+      -32deg,
+      transparent 0,
+      transparent 84px,
+      rgba(255, 255, 255, 0.04) 84px,
+      rgba(255, 255, 255, 0.04) 90px
+    );
+}
+
+.login-pf-page {
+  width: min(1220px, 94vw);
+  min-height: min(92vh, 900px);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(340px, 44%) minmax(380px, 56%);
+  align-items: stretch;
+  border-radius: 30px;
+  overflow: hidden;
+  box-shadow: 0 34px 70px rgba(1, 10, 8, 0.56);
+}
+
+#kc-header {
+  position: relative;
+  margin: 0;
+  padding: clamp(46px, 8vw, 92px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  border-right: 1px solid rgba(52, 211, 153, 0.18);
+  background: linear-gradient(155deg, rgba(3, 35, 27, 0.8), rgba(2, 11, 8, 0.66));
+  overflow: hidden;
+}
+
+#kc-header::before {
+  content: "";
+  position: absolute;
+  width: 58vmin;
+  height: 58vmin;
+  top: -24vmin;
+  left: -20vmin;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.32) 0, rgba(16, 185, 129, 0) 70%);
+  pointer-events: none;
+}
+
+#kc-header-wrapper {
+  position: relative;
+  color: #ecfdf5;
+  font-size: clamp(3rem, 8vw, 6.6rem);
+  line-height: 0.92;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: 700;
+  max-width: 4.4ch;
+  margin-top: -5vh;
+  text-shadow: 0 16px 34px rgba(2, 12, 9, 0.5);
+}
+
+#kc-header::after {
+  content: "Plateforme RH moderne, rapide et securisee pour les equipes d'Afrique de l'Ouest.";
+  position: relative;
+  margin-top: clamp(18px, 2.5vw, 28px);
+  font-size: clamp(0.92rem, 1.35vw, 1.1rem);
+  line-height: 1.7;
+  color: rgba(236, 253, 245, 0.84);
+  max-width: 34ch;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.card-pf {
+  position: relative;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  min-height: 100%;
+  background: linear-gradient(170deg, rgba(248, 250, 249, 0.93), rgba(240, 247, 244, 0.92));
+  padding: clamp(26px, 6vw, 78px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: none;
+}
+
+.card-pf::before {
+  content: "";
+  position: absolute;
+  inset: 24px;
+  border-radius: 28px;
+  border: 1px solid var(--sirh-card-border);
+  box-shadow: 0 26px 44px rgba(2, 44, 34, 0.16);
+  pointer-events: none;
+}
+
+.login-pf-header,
+#kc-content {
+  width: min(490px, 100%);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.login-pf-header {
+  margin-bottom: 18px;
+}
+
+#kc-page-title {
+  color: var(--sirh-text-main);
+  font-size: clamp(2rem, 2.8vw, 2.55rem);
+  font-weight: 700;
+  margin: 0;
+  line-height: 1.08;
+  text-align: left;
+  letter-spacing: -0.01em;
+}
+
+#kc-content {
+  margin-top: 0;
+}
+
+#kc-content-wrapper {
+  color: var(--sirh-text-soft);
+}
+
+#kc-content-wrapper::before {
+  content: "Connectez-vous pour acceder a votre espace RH.";
+  display: block;
+  margin-bottom: 18px;
+  color: #556b84;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+#kc-locale {
+  position: absolute;
+  top: clamp(20px, 3.2vw, 36px);
+  right: clamp(20px, 3.5vw, 38px);
+  margin: 0;
+  z-index: 10;
+}
+
+#kc-current-locale-link {
+  display: none;
+}
+
+#language-switch1 {
+  position: static !important;
+  display: flex !important;
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+  min-width: auto;
+}
+
+#language-switch1 > li {
+  list-style: none;
+}
+
+#language-switch1 > li > a.pf-c-dropdown__menu-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  font-size: 0;
+  padding: 0;
+  transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+}
+
+#language-switch1 > li > a.pf-c-dropdown__menu-item:hover {
+  transform: translateY(-1px);
+  border-color: #94a3b8;
+}
+
+#language-switch1 > li > a[href*="kc_locale=fr"]::before,
+#language-switch1 > li > a[href*="kc_locale=en"]::before {
+  font-size: 19px;
+  line-height: 1;
+}
+
+#language-switch1 > li > a[href*="kc_locale=fr"]::before {
+  content: "🇫🇷";
+}
+
+#language-switch1 > li > a[href*="kc_locale=en"]::before {
+  content: "🇬🇧";
+}
+
+html[lang="fr"] #language-switch1 > li > a[href*="kc_locale=fr"],
+html[lang="en"] #language-switch1 > li > a[href*="kc_locale=en"] {
+  border-color: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.18);
+}
+
+#language-switch1 > li > a[href*="kc_locale=fr"] .pf-v5-screen-reader,
+#language-switch1 > li > a[href*="kc_locale=en"] .pf-v5-screen-reader {
+  font-size: 1px;
+}
+
+#kc-form-login .form-group {
+  margin-bottom: 16px;
+}
+
+#kc-form-login label {
+  display: block;
+  margin-bottom: 9px;
+  color: #2a3d52;
+  font-size: 0.86rem;
+  font-weight: 700;
+  letter-spacing: 0.015em;
+}
+
+#kc-form-login .pf-c-form-control,
+#kc-form-login .form-control,
+#kc-form-login input[type="text"],
+#kc-form-login input[type="password"],
+#kc-form-login input[type="email"] {
+  width: 100%;
+  min-height: 52px;
+  border-radius: var(--sirh-radius-md);
+  border: 1px solid #bfd0de;
+  background: #ffffff;
+  box-shadow: none;
+  color: #0d1b2a;
+  font-size: 0.95rem;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+
+#kc-form-login .pf-c-form-control:focus,
+#kc-form-login input[type="text"]:focus,
+#kc-form-login input[type="password"]:focus,
+#kc-form-login input[type="email"]:focus {
+  border-color: var(--sirh-primary);
+  box-shadow: 0 0 0 3px var(--sirh-focus), 0 6px 16px rgba(16, 185, 129, 0.08);
+  background: #ffffff;
+}
+
+#kc-form-login input::placeholder {
+  color: #8ea0b2;
+}
+
+#kc-form-login input:-webkit-autofill,
+#kc-form-login input:-webkit-autofill:hover,
+#kc-form-login input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #0d1b2a;
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset;
+  transition: background-color 9999s ease-out;
+}
+
+#kc-form-login .pf-c-input-group .pf-c-button.pf-m-control {
+  border-radius: 0 var(--sirh-radius-md) var(--sirh-radius-md) 0;
+  border-color: #bfd0de;
+  background: #f8fafc;
+}
+
+.login-pf-settings {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+#kc-form-options {
+  margin: 0;
+  color: #475569;
+  font-size: 0.82rem;
+}
+
+#kc-form-options label {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #41566d;
+}
+
+#kc-form-options a,
+#kc-registration a,
+#kc-info-wrapper a {
+  color: #0f766e;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+#kc-form-options a:hover,
+#kc-registration a:hover,
+#kc-info-wrapper a:hover {
+  text-decoration: underline;
+}
+
+#kc-form-buttons {
+  margin-top: 24px;
+}
+
+#kc-login,
+input#kc-login,
+input[type="submit"][name="login"] {
+  width: 100%;
+  min-height: 54px;
+  border: 0;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--sirh-primary), var(--sirh-primary-dark));
+  color: #ecfdf5;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  box-shadow: 0 16px 30px rgba(5, 150, 105, 0.25);
+  transition: transform 140ms ease, box-shadow 140ms ease, filter 140ms ease;
+}
+
+#kc-login:hover,
+input#kc-login:hover,
+input[type="submit"][name="login"]:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 34px rgba(5, 150, 105, 0.3);
+  filter: saturate(1.06);
+}
+
+#kc-login:active,
+input#kc-login:active,
+input[type="submit"][name="login"]:active {
+  transform: translateY(0);
+}
+
+.alert {
+  border: 0;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  font-size: 0.82rem;
+}
+
+.alert-error,
+.pf-m-danger {
+  background: rgba(239, 68, 68, 0.12);
+  color: #b91c1c;
+}
+
+.alert-success,
+.pf-m-success {
+  background: rgba(16, 185, 129, 0.15);
+  color: #065f46;
+}
+
+#kc-info-wrapper {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(148, 163, 184, 0.14);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  color: #334155;
+  font-size: 0.82rem;
+}
+
+@media (max-width: 1080px) {
+  html.login-pf body {
+    display: block;
+  }
+
+  .login-pf-page {
+    width: 100%;
+    min-height: 100vh;
+    border-radius: 0;
+    box-shadow: none;
+    grid-template-columns: 1fr;
+  }
+
+  #kc-header {
+    min-height: 34vh;
+    justify-content: center;
+    border-right: 0;
+    border-bottom: 1px solid rgba(52, 211, 153, 0.16);
+    padding: clamp(26px, 7vw, 48px);
+  }
+
+  #kc-header-wrapper {
+    max-width: none;
+    font-size: clamp(2.6rem, 10vw, 4.4rem);
+    margin-top: 0;
+  }
+
+  #kc-header::after {
+    max-width: 52ch;
+  }
+
+  .card-pf {
+    min-height: 66vh;
+    padding: clamp(22px, 6vw, 44px);
+  }
+
+  .card-pf::before {
+    inset: 12px;
+  }
+}
+
+@media (max-width: 680px) {
+  #kc-header {
+    min-height: 30vh;
+  }
+
+  #kc-locale {
+    position: static;
+    margin-bottom: 12px;
+  }
+
+  .login-pf-header,
+  #kc-content {
+    width: 100%;
+  }
+
+  .card-pf {
+    min-height: 70vh;
+    padding: 18px;
+  }
+
+  .card-pf::before {
+    border-radius: 20px;
+  }
+
+  .login-pf-settings {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

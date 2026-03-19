@@ -1,5 +1,6 @@
 import * as React from "react"
 import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area"
+import PropTypes from "prop-types";
 
 import { cn } from "../../lib/utils"
 
@@ -16,6 +17,10 @@ const ScrollArea = React.forwardRef(({ className, children, ...props }, ref) => 
   </ScrollAreaPrimitive.Root>
 ))
 ScrollArea.displayName = ScrollAreaPrimitive.Root.displayName
+ScrollArea.propTypes = {
+  className: PropTypes.string,
+  children: PropTypes.node,
+};
 
 const ScrollBar = React.forwardRef(({ className, orientation = "vertical", ...props }, ref) => (
   <ScrollAreaPrimitive.ScrollAreaScrollbar
@@ -34,5 +39,9 @@ const ScrollBar = React.forwardRef(({ className, orientation = "vertical", ...pr
   </ScrollAreaPrimitive.ScrollAreaScrollbar>
 ))
 ScrollBar.displayName = ScrollAreaPrimitive.ScrollAreaScrollbar.displayName
+ScrollBar.propTypes = {
+  className: PropTypes.string,
+  orientation: PropTypes.oneOf(["vertical", "horizontal"]),
+};
 
 export { ScrollArea, ScrollBar }

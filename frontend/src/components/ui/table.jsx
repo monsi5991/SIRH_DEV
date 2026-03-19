@@ -1,6 +1,11 @@
-import * as React from "react"
+import * as React from "react";
+import PropTypes from "prop-types";
+import { cn } from "../../lib/utils";
 
-import { cn } from "../../lib/utils"
+const baseProps = {
+  className: PropTypes.string,
+  children: PropTypes.node,
+};
 
 const Table = React.forwardRef(({ className, ...props }, ref) => (
   <div className="relative w-full overflow-auto">
@@ -9,29 +14,33 @@ const Table = React.forwardRef(({ className, ...props }, ref) => (
       className={cn("w-full caption-bottom text-sm", className)}
       {...props} />
   </div>
-))
-Table.displayName = "Table"
+));
+Table.displayName = "Table";
+Table.propTypes = baseProps;
 
 const TableHeader = React.forwardRef(({ className, ...props }, ref) => (
   <thead ref={ref} className={cn("[&_tr]:border-b", className)} {...props} />
-))
-TableHeader.displayName = "TableHeader"
+));
+TableHeader.displayName = "TableHeader";
+TableHeader.propTypes = baseProps;
 
 const TableBody = React.forwardRef(({ className, ...props }, ref) => (
   <tbody
     ref={ref}
     className={cn("[&_tr:last-child]:border-0", className)}
     {...props} />
-))
-TableBody.displayName = "TableBody"
+));
+TableBody.displayName = "TableBody";
+TableBody.propTypes = baseProps;
 
 const TableFooter = React.forwardRef(({ className, ...props }, ref) => (
   <tfoot
     ref={ref}
     className={cn("border-t bg-muted/50 font-medium [&>tr]:last:border-b-0", className)}
     {...props} />
-))
-TableFooter.displayName = "TableFooter"
+));
+TableFooter.displayName = "TableFooter";
+TableFooter.propTypes = baseProps;
 
 const TableRow = React.forwardRef(({ className, ...props }, ref) => (
   <tr
@@ -41,8 +50,9 @@ const TableRow = React.forwardRef(({ className, ...props }, ref) => (
       className
     )}
     {...props} />
-))
-TableRow.displayName = "TableRow"
+));
+TableRow.displayName = "TableRow";
+TableRow.propTypes = baseProps;
 
 const TableHead = React.forwardRef(({ className, ...props }, ref) => (
   <th
@@ -52,8 +62,9 @@ const TableHead = React.forwardRef(({ className, ...props }, ref) => (
       className
     )}
     {...props} />
-))
-TableHead.displayName = "TableHead"
+));
+TableHead.displayName = "TableHead";
+TableHead.propTypes = baseProps;
 
 const TableCell = React.forwardRef(({ className, ...props }, ref) => (
   <td
@@ -63,16 +74,18 @@ const TableCell = React.forwardRef(({ className, ...props }, ref) => (
       className
     )}
     {...props} />
-))
-TableCell.displayName = "TableCell"
+));
+TableCell.displayName = "TableCell";
+TableCell.propTypes = baseProps;
 
 const TableCaption = React.forwardRef(({ className, ...props }, ref) => (
   <caption
     ref={ref}
     className={cn("mt-4 text-sm text-muted-foreground", className)}
     {...props} />
-))
-TableCaption.displayName = "TableCaption"
+));
+TableCaption.displayName = "TableCaption";
+TableCaption.propTypes = baseProps;
 
 export {
   Table,
@@ -83,4 +96,4 @@ export {
   TableRow,
   TableCell,
   TableCaption,
-}
+};

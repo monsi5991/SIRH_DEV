@@ -8,9 +8,11 @@ import { get, patch, post } from "../../lib/api";
 import ComplianceTaskFormDialog from "../../components/resources/ComplianceTaskFormDialog";
 import { kpiStart, kpiSuccess, kpiError, kpiComplianceEvidence } from "../../lib/kpiTracker";
 import EvidenceUploadDialog from "../../components/resources/EvidenceUploadDialog";
+import usePageMeta from "../../hooks/usePageMeta";
 
 export default function CompliancePage() {
   const { formatDate } = useApp();
+  usePageMeta("Conformité RH", "Suivez vos obligations sociales, pièces justificatives et tâches de conformité RH.");
   const [summary, setSummary] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -90,7 +92,7 @@ export default function CompliancePage() {
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Conformité RH – Sénégal (MVP)</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Conformité RH & obligations sociales</h1>
         <div className="flex gap-2">
           <Button variant="outline" onClick={load}>Rafraîchir</Button>
           <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => setOpenTask(true)}><Plus className="w-4 h-4 mr-2" /> Nouvelle tâche</Button>

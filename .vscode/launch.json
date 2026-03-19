@@ -1,0 +1,26 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Flutter Dev",
+      "request": "launch",
+      "type": "dart",
+      "cwd": "mobile",
+      "program": "lib/main_dev.dart"
+    },
+    {
+      "name": "Flutter Preprod",
+      "request": "launch",
+      "type": "dart",
+      "cwd": "mobile",
+      "program": "lib/main_preprod.dart"
+    },
+    {
+      "name": "Flutter Prod",
+      "request": "launch",
+      "type": "dart",
+      "cwd": "mobile",
+      "program": "lib/main_prod.dart"
+    }
+  ]
+}

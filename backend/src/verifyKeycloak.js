@@ -4,6 +4,7 @@ import { jwtVerify, createRemoteJWKSet } from "jose";
 
 const ISSUER = process.env.KEYCLOAK_ISSUER; // ex: http://localhost:8080/realms/SIRH
 const CLIENT_ID = process.env.KEYCLOAK_CLIENT_ID || "sirh-frontend";
+const ALLOW_ACCOUNT_AUD = process.env.KEYCLOAK_ALLOW_ACCOUNT_AUD === "true";
 
 if (!ISSUER) {
   console.warn("[verifyKeycloak] KEYCLOAK_ISSUER is missing in .env");
@@ -17,6 +18,15 @@ function getBearer(req) {
   return h.slice(7).trim();
 }
 
+function getQueryToken(req) {
+  const routePath = String(req.originalUrl || req.path || "");
+  if (req.method !== "GET" || !routePath.startsWith("/uploads")) return null;
+  const value = req.query?.access_token;
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed || null;
+}
+
 function normalizeAud(aud) {
   if (!aud) return [];
   return Array.isArray(aud) ? aud : [aud];
@@ -24,7 +34,7 @@ function normalizeAud(aud) {
 
 export async function verifyKeycloak(req, res, next) {
   try {
-    const token = getBearer(req);
+    const token = getBearer(req) || getQueryToken(req);
     if (!token) return res.status(401).json({ error: "Missing Bearer token" });
 
     // Vérifie signature + issuer (audience on gère après)
@@ -40,7 +50,7 @@ export async function verifyKeycloak(req, res, next) {
 
     const audOk =
       audList.includes(CLIENT_ID) ||
-      audList.includes("account") ||      // très fréquent
+      (ALLOW_ACCOUNT_AUD && audList.includes("account")) ||
       azp === CLIENT_ID;                  // authorized party
 
     if (!audOk) {

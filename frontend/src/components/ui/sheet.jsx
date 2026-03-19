@@ -2,6 +2,7 @@ import * as React from "react"
 import * as SheetPrimitive from "@radix-ui/react-dialog"
 import { cva } from "class-variance-authority";
 import { X } from "lucide-react"
+import PropTypes from "prop-types";
 
 import { cn } from "../../lib/utils"
 
@@ -23,6 +24,9 @@ const SheetOverlay = React.forwardRef(({ className, ...props }, ref) => (
     ref={ref} />
 ))
 SheetOverlay.displayName = SheetPrimitive.Overlay.displayName
+SheetOverlay.propTypes = {
+  className: PropTypes.string,
+};
 
 const sheetVariants = cva(
   "fixed z-50 gap-4 bg-background p-6 shadow-lg transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500 data-[state=open]:animate-in data-[state=closed]:animate-out",
@@ -57,6 +61,11 @@ const SheetContent = React.forwardRef(({ side = "right", className, children, ..
   </SheetPortal>
 ))
 SheetContent.displayName = SheetPrimitive.Content.displayName
+SheetContent.propTypes = {
+  side: PropTypes.oneOf(["top", "bottom", "left", "right"]),
+  className: PropTypes.string,
+  children: PropTypes.node,
+};
 
 const SheetHeader = ({
   className,
@@ -67,6 +76,10 @@ const SheetHeader = ({
     {...props} />
 )
 SheetHeader.displayName = "SheetHeader"
+SheetHeader.propTypes = {
+  className: PropTypes.string,
+  children: PropTypes.node,
+};
 
 const SheetFooter = ({
   className,
@@ -77,6 +90,10 @@ const SheetFooter = ({
     {...props} />
 )
 SheetFooter.displayName = "SheetFooter"
+SheetFooter.propTypes = {
+  className: PropTypes.string,
+  children: PropTypes.node,
+};
 
 const SheetTitle = React.forwardRef(({ className, ...props }, ref) => (
   <SheetPrimitive.Title
@@ -85,6 +102,10 @@ const SheetTitle = React.forwardRef(({ className, ...props }, ref) => (
     {...props} />
 ))
 SheetTitle.displayName = SheetPrimitive.Title.displayName
+SheetTitle.propTypes = {
+  className: PropTypes.string,
+  children: PropTypes.node,
+};
 
 const SheetDescription = React.forwardRef(({ className, ...props }, ref) => (
   <SheetPrimitive.Description
@@ -93,6 +114,10 @@ const SheetDescription = React.forwardRef(({ className, ...props }, ref) => (
     {...props} />
 ))
 SheetDescription.displayName = SheetPrimitive.Description.displayName
+SheetDescription.propTypes = {
+  className: PropTypes.string,
+  children: PropTypes.node,
+};
 
 export {
   Sheet,

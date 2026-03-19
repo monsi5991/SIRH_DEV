@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import PropTypes from "prop-types";
-import { get } from "../../lib/api";
 import { Button } from "../ui/button";
+import { listTemplates } from "../../lib/documentsApi";
 
 export default function TemplatePicker({ scope = "onboarding", value = [], onChange }) {
   const [loading, setLoading] = useState(true);
@@ -13,11 +13,9 @@ export default function TemplatePicker({ scope = "onboarding", value = [], onCha
     (async () => {
       setLoading(true); setErr("");
       try {
-        // backend: GET /documents/templates?category=onboarding|offboarding
-        const res = await get(`/documents/templates?category=${scope}`);
-        const list = Array.isArray(res?.items) ? res.items : Array.isArray(res) ? res : [];
+        const list = await listTemplates(scope);
         if (!mounted) return;
-        setItems(list);
+        setItems(Array.isArray(list) ? list : []);
       } catch (e) {
         if (!mounted) return;
         setErr(e?.message || "Erreur chargement modèles");
@@ -44,7 +42,8 @@ export default function TemplatePicker({ scope = "onboarding", value = [], onCha
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
       {items.map((tpl) => {
-        const id = tpl.id || tpl.name;
+        const id = tpl.key || tpl.id || tpl.name;
+        const label = tpl.label || tpl.name || id;
         const isSel = selectedSet.has(id);
         return (
           <label
@@ -60,7 +59,7 @@ export default function TemplatePicker({ scope = "onboarding", value = [], onCha
               onChange={() => toggle(id)}
             />
             <div className="flex-1">
-              <div className="text-sm font-medium">{tpl.name}</div>
+              <div className="text-sm font-medium">{label}</div>
               <div className="text-xs text-gray-500">
                 {tpl.country || "SN"} · {tpl.language || "FR"} · {tpl.fileType || "docx"}
               </div>

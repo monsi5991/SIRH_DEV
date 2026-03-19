@@ -7,35 +7,73 @@ import { prisma } from "./prisma.js";
 export async function enrichUser(userId) {
   const u = await prisma.user.findUnique({
     where: { id: userId },
-    include: {
-      tenant: true,
-      roles: {
-        include: {
-          role: {
-            include: {
-              rolePermissions: { include: { permission: true } },
-            },
-          },
-        },
-      },
+    select: {
+      id: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      tenantId: true,
+      employee: { select: { id: true } },
     },
   });
 
   if (!u) return null;
 
-  const roles = u.roles.map((r) => r.role.name);
+  const tenant = u.tenantId
+    ? await prisma.tenant.findUnique({
+        where: { id: u.tenantId },
+        select: { id: true, name: true },
+      }).catch((error) => {
+        console.warn("[enrichUser] tenant lookup failed:", error?.message || error);
+        return null;
+      })
+    : null;
+
+  const userRoles = await prisma.userRole.findMany({
+    where: { userId },
+    select: { roleId: true },
+  });
+
+  const roleIds = [...new Set(userRoles.map((row) => row.roleId).filter(Boolean))];
+  const roleRows = roleIds.length
+    ? await prisma.role.findMany({
+        where: { id: { in: roleIds } },
+        select: {
+          name: true,
+          rolePermissions: {
+            select: {
+              permission: {
+                select: { name: true },
+              },
+            },
+          },
+        },
+      }).catch((error) => {
+        console.warn("[enrichUser] role lookup failed:", error?.message || error);
+        return [];
+      })
+    : [];
+
+  const roles = roleRows.map((role) => role.name).filter(Boolean);
   const permissions = new Set();
-  u.roles.forEach((r) =>
-    r.role.rolePermissions.forEach((rp) => permissions.add(rp.permission.name))
-  );
+  roleRows.forEach((role) => {
+    (role.rolePermissions || []).forEach((rp) => {
+      const permissionName = rp?.permission?.name;
+      if (permissionName) permissions.add(permissionName);
+    });
+  });
 
   return {
     id: u.id,
     email: u.email,
     firstName: u.firstName,
     lastName: u.lastName,
+    employeeId: u.employee?.id || null,
     tenantId: u.tenantId,
-    tenant: { id: u.tenant.id, name: u.tenant.name },
+    tenant: {
+      id: tenant?.id || u.tenantId,
+      name: tenant?.name || "Organisation",
+    },
     roles,
     permissions: Array.from(permissions),
   };

@@ -4,8 +4,10 @@ import multer from "multer";
 import fs from "fs";
 import path from "path";
 import { prisma } from "../../prisma.js";
+import { requirePermissions } from "../../rbac.js";
 
 const router = express.Router();
+router.use(requirePermissions(["directory_read"], "anyOf"));
 
 const getTenantId = (req) =>
   req.auth?.tid || req.user?.tenantId || req.headers["x-tenant-id"];
@@ -19,7 +21,22 @@ const storage = multer.diskStorage({
   filename: (_, file, cb) =>
     cb(null, `${Date.now()}_${file.originalname.replace(/\s+/g, "_")}`),
 });
-const upload = multer({ storage });
+const MAX_UPLOAD_MB = Number(process.env.MAX_UPLOAD_SIZE_MB || 10);
+const ALLOWED_UPLOAD_MIME_TYPES = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+const upload = multer({
+  storage,
+  limits: { fileSize: MAX_UPLOAD_MB * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (ALLOWED_UPLOAD_MIME_TYPES.has(file.mimetype)) return cb(null, true);
+    return cb(new Error("unsupported_file_type"));
+  },
+});
+const ALLOWED_STATUS = new Set(["TODO", "DOING", "DONE", "EXPIRED"]);
 
 /* =========================
  *          KPIs
@@ -27,6 +44,7 @@ const upload = multer({ storage });
 router.get("/summary", async (req, res) => {
   try {
     const tenantId = getTenantId(req);
+    if (!tenantId) return res.status(401).json({ error: "Unauthorized" });
     const now = new Date();
 
     const tasks = await prisma.complianceTask.findMany({
@@ -71,6 +89,7 @@ router.get("/summary", async (req, res) => {
 router.get("/counters", async (req, res) => {
   try {
     const tenantId = getTenantId(req);
+    if (!tenantId) return res.status(401).json({ error: "Unauthorized" });
     const now = new Date();
     const soon = new Date(Date.now() + 7 * 86400000);
 
@@ -93,6 +112,7 @@ router.get("/counters", async (req, res) => {
 router.get("/tasks", async (req, res) => {
   try {
     const tenantId = getTenantId(req);
+    if (!tenantId) return res.status(401).json({ error: "Unauthorized" });
     const { status = "", employeeId = "", q = "", page = "1", pageSize = "20", sort = "dueAt", dir = "asc" } = req.query;
     const skip = (Number(page) - 1) * Number(pageSize);
     const orderBy = [{ [sort]: dir.toLowerCase() === "desc" ? "desc" : "asc" }];
@@ -118,7 +138,22 @@ router.get("/tasks", async (req, res) => {
       items = items.filter((t) => t.status === status.toUpperCase());
     }
 
-    const total = await prisma.complianceTask.count({ where });
+    let total;
+    if (status.toUpperCase() === "OVERDUE") {
+      total = await prisma.complianceTask.count({
+        where: {
+          ...where,
+          status: { not: "DONE" },
+          dueAt: { lt: now },
+        },
+      });
+    } else if (["TODO", "DOING", "DONE", "EXPIRED"].includes(status.toUpperCase())) {
+      total = await prisma.complianceTask.count({
+        where: { ...where, status: status.toUpperCase() },
+      });
+    } else {
+      total = await prisma.complianceTask.count({ where });
+    }
     res.json({ items, page: Number(page), pageSize: Number(pageSize), total });
   } catch (e) {
     console.error(e);
@@ -129,11 +164,20 @@ router.get("/tasks", async (req, res) => {
 /* =========================
  *         WRITE
  * ========================= */
-router.post("/tasks", async (req, res) => {
+router.post("/tasks", requirePermissions(["all"], "anyOf"), async (req, res) => {
   try {
     const tenantId = getTenantId(req);
+    if (!tenantId) return res.status(401).json({ error: "Unauthorized" });
     const { label, category, employeeId = null, dueAt = null, notes = "", obligationKey = "" } = req.body || {};
     if (!label || !category) return res.status(400).json({ error: "label & category required" });
+
+    if (employeeId) {
+      const employee = await prisma.employee.findFirst({
+        where: { id: employeeId, tenantId },
+        select: { id: true },
+      });
+      if (!employee) return res.status(404).json({ error: "employee_not_found" });
+    }
 
     let obligationId = null;
     if (obligationKey) {
@@ -159,10 +203,20 @@ router.post("/tasks", async (req, res) => {
   }
 });
 
-router.patch("/tasks/:id", async (req, res) => {
+router.patch("/tasks/:id", requirePermissions(["all"], "anyOf"), async (req, res) => {
   try {
+    const tenantId = getTenantId(req);
+    if (!tenantId) return res.status(401).json({ error: "Unauthorized" });
     const { id } = req.params;
     const { status, evidenceUrl, notes } = req.body || {};
+    if (status && !ALLOWED_STATUS.has(String(status).toUpperCase())) {
+      return res.status(400).json({ error: "invalid_status" });
+    }
+    const existing = await prisma.complianceTask.findFirst({
+      where: { id, tenantId },
+      select: { id: true },
+    });
+    if (!existing) return res.status(404).json({ error: "Not found" });
     const data = {
       ...(status ? { status: status.toUpperCase() } : {}),
       ...(evidenceUrl ? { evidenceUrl } : {}),
@@ -200,10 +254,17 @@ router.patch("/tasks/:id", async (req, res) => {
   }
 });
 
-router.post("/tasks/:id/evidence", upload.single("file"), async (req, res) => {
+router.post("/tasks/:id/evidence", requirePermissions(["all"], "anyOf"), upload.single("file"), async (req, res) => {
   try {
+    const tenantId = getTenantId(req);
+    if (!tenantId) return res.status(401).json({ error: "Unauthorized" });
     const { id } = req.params;
     if (!req.file) return res.status(400).json({ error: "file missing" });
+    const existing = await prisma.complianceTask.findFirst({
+      where: { id, tenantId },
+      select: { id: true },
+    });
+    if (!existing) return res.status(404).json({ error: "Not found" });
     const url = `/uploads/${req.file.filename}`;
 
     const updated = await prisma.complianceTask.update({
@@ -212,6 +273,18 @@ router.post("/tasks/:id/evidence", upload.single("file"), async (req, res) => {
     });
     res.json(updated);
   } catch (e) {
+    if (e instanceof multer.MulterError && e.code === "LIMIT_FILE_SIZE") {
+      return res.status(400).json({
+        error: "file_too_large",
+        message: `Fichier trop volumineux. Taille max: ${MAX_UPLOAD_MB} Mo.`,
+      });
+    }
+    if (e?.message === "unsupported_file_type") {
+      return res.status(400).json({
+        error: "unsupported_file_type",
+        message: "Type de fichier non autorisé. Utilisez PDF, JPG, PNG ou WEBP.",
+      });
+    }
     if (e.code === "P2025") return res.status(404).json({ error: "Not found" });
     console.error(e);
     res.status(400).json({ error: "Upload failed" });
@@ -224,6 +297,7 @@ router.post("/tasks/:id/evidence", upload.single("file"), async (req, res) => {
 router.get("/obligations", async (req, res) => {
   try {
     const tenantId = getTenantId(req);
+    if (!tenantId) return res.status(401).json({ error: "Unauthorized" });
     const items = await prisma.complianceObligation.findMany({
       where: { tenantId, isActive: true },
       orderBy: [{ key: "asc" }],
@@ -235,9 +309,10 @@ router.get("/obligations", async (req, res) => {
   }
 });
 
-router.post("/generate/onboarding", async (req, res) => {
+router.post("/generate/onboarding", requirePermissions(["all"], "anyOf"), async (req, res) => {
   try {
     const tenantId = getTenantId(req);
+    if (!tenantId) return res.status(401).json({ error: "Unauthorized" });
     const { checklistCode = "ONB-SN-DEFAULT", employeeId, joinDate = null } = req.body || {};
     if (!employeeId) return res.status(400).json({ error: "employeeId required" });
 
@@ -279,6 +354,7 @@ router.post("/generate/onboarding", async (req, res) => {
 router.get("/tasks/export/csv", async (req, res) => {
   try {
     const tenantId = getTenantId(req);
+    if (!tenantId) return res.status(401).json({ error: "Unauthorized" });
     const items = await prisma.complianceTask.findMany({
       where: { tenantId },
       include: { employee: { select: { firstName: true, lastName: true, email: true } } },

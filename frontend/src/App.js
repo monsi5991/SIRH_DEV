@@ -1,39 +1,44 @@
-// src/App.jsx
 import React from "react";
 import "./App.css";
-import { BrowserRouter, Routes, Route, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Outlet, useLocation, useNavigate, Navigate } from "react-router-dom";
 import PropTypes from "prop-types";
 
 import { Toaster } from "./components/ui/toaster";
 
 import ProtectedRoute from "./components/auth/ProtectedRoute";
+import ScopeRoute from "./components/auth/ScopeRoute";
 
 // Public pages
-import LoginPage from "./pages/auth/LoginPage";
 import ForbiddenPage from "./pages/ForbiddenPage";
 
 // Layout
 import Header from "./components/layout/Header";
 import Sidebar from "./components/layout/Sidebar";
 
-// Pages (Dashboard & Ops)
+// Core pages
 import HomePage from "./pages/HomePage";
+
+// Operations
 import LeavesPage from "./pages/operations/LeavesPage";
 import TimePage from "./pages/operations/TimePage";
 import PlanningPage from "./pages/operations/PlanningPage";
 import ExpensesPage from "./pages/operations/ExpensesPage";
+import AttendancePage from "./pages/operations/AttendancePage";
+import HrRequestsPage from "./pages/operations/HrRequestsPage";
 
-// RH / People
+// People
 import AnnuairePage from "./pages/people/AnnuairePage";
 import PerformancePage from "./pages/people/PerformancePage";
 import PerformanceDetailPage from "./pages/people/PerformanceDetailPage";
 import FormationPage from "./pages/people/FormationPage";
+import EmployeeContractsPage from "./pages/people/EmployeeContractsPage";
+import EmployeeDocumentsHubPage from "./pages/people/EmployeeDocumentsHubPage";
 
 // Documents
 import OnboardingPage from "./pages/documents/OnboardingPage";
 import OffboardingPage from "./pages/documents/OffboardingPage";
 
-// Resources
+// Resources / analytics / admin
 import CompliancePage from "./pages/resources/CompliancePage";
 import PoliciesPage from "./pages/resources/PoliciesPage";
 import AnalyticsReportsPage from "./pages/analytics/AnalyticsReportsPage";
@@ -41,25 +46,35 @@ import AnalyticsDashboardsPage from "./pages/analytics/AnalyticsDashboardsPage";
 import AdminStructurePage from "./pages/admin/AdminStructurePage";
 import AdminPermissionsPage from "./pages/admin/AdminPermissionsPage";
 import AdminIntegrationsPage from "./pages/admin/AdminIntegrationsPage";
+import AdminWorkflowsPage from "./pages/admin/AdminWorkflowsPage";
+import AdminAuditLogPage from "./pages/admin/AdminAuditLogPage";
+
+// Manager
 import ManagerDashboardPage from "./pages/manager/ManagerDashboardPage";
-import TeamApprovalsPage from "./pages/manager/TeamApprovalsPage";
-import ManagerTeamOverviewPage from "./pages/manager/ManagerTeamOverviewPage";
-import ManagerPerformancePage from "./pages/manager/ManagerPerformancePage";
+import ManagerApprovalsPage from "./pages/manager/ManagerApprovalsPage";
+
+// Employee self-service
 import EmployeeDashboardPage from "./pages/employee/EmployeeDashboardPage";
 import EmployeeProfilePage from "./pages/employee/EmployeeProfilePage";
 import EmployeeRequestsPage from "./pages/employee/EmployeeRequestsPage";
 import EmployeeDocumentsPage from "./pages/employee/EmployeeDocumentsPage";
-import MyPayslipsPage from "./pages/employee/MyPayslipsPage";
+import EmployeeTimeAbsencesPage from "./pages/employee/EmployeeTimeAbsencesPage";
+import EmployeePerformancePage from "./pages/employee/EmployeePerformancePage";
+import EmployeeTrainingsPage from "./pages/employee/EmployeeTrainingsPage";
+import EmployeeHelpPage from "./pages/employee/EmployeeHelpPage";
+import EmployeeIndicatorsPage from "./pages/employee/EmployeeIndicatorsPage";
+import SettingsPage from "./pages/settings/SettingsPage";
+
+// HR space
 import HrWorkforcePlanningPage from "./pages/hr/HrWorkforcePlanningPage";
 import HrStrategicReviewsPage from "./pages/hr/HrStrategicReviewsPage";
+import HrDashboardPage from "./pages/hr/HrDashboardPage";
 
-// RH (optionnel)
-import EmployeeListPage from "./pages/employee/EmployeeListPage";
+// Employee admin pages
 import EmployeeEditPage from "./pages/employee/EmployeeEditPage";
+import { useAuth } from "./contexts/AuthContext";
+import { normalizeRoles } from "./lib/permissions";
 
-/* =========================
- * Layout wrapper (protégé)
- * ========================= */
 function AppShell({ user }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -89,9 +104,6 @@ AppShell.propTypes = {
   }),
 };
 
-/* =========================
- * Route group protected
- * ========================= */
 function RequireAuthLayout() {
   return (
     <ProtectedRoute redirectTo="/login">
@@ -100,60 +112,141 @@ function RequireAuthLayout() {
   );
 }
 
-/* =========================
- * Helper: perms
- * - Pas besoin de mettre "all" partout : hasPermissions gère déjà "all"
- * ========================= */
-const Perm = (props) => <ProtectedRoute {...props} enforce="perm" />;
 const RolePerm = (props) => <ProtectedRoute {...props} enforce="both" />;
-/* Usage: <Perm requiredPermissions={["operations_read"]}><Page/></Perm> */
+const Access = (props) => <ScopeRoute {...props} />;
 
-/* =========================
- * Routes
- * ========================= */
+function RoleHomeRedirect() {
+  const { user, loading } = useAuth();
+  if (loading || !user) return <div className="p-6 text-center">Chargement…</div>;
+
+  const roles = normalizeRoles(user?.roles || user?.role || []);
+  if (roles.includes("ADMIN") || roles.includes("HR")) return <Navigate to="/hr/dashboard" replace />;
+  if (roles.includes("MANAGER")) return <Navigate to="/manager/dashboard" replace />;
+  if (roles.includes("EMPLOYEE")) return <Navigate to="/employee/dashboard" replace />;
+  return <HomePage />;
+}
+
+function DashboardOverviewRedirect() {
+  const { user, loading } = useAuth();
+  if (loading || !user) return <div className="p-6 text-center">Chargement…</div>;
+
+  const roles = normalizeRoles(user?.roles || user?.role || []);
+  if (roles.includes("ADMIN") || roles.includes("HR")) return <Navigate to="/hr/dashboard" replace />;
+  if (roles.includes("MANAGER")) return <Navigate to="/manager/dashboard" replace />;
+  if (roles.includes("EMPLOYEE")) return <Navigate to="/employee/dashboard" replace />;
+  return <Navigate to="/" replace />;
+}
+
+function RedirectPreserveSearch({ to }) {
+  const location = useLocation();
+  const nextUrl = React.useMemo(() => {
+    const target = new URL(to, window.location.origin);
+    const currentParams = new URLSearchParams(location.search || "");
+
+    currentParams.forEach((value, key) => {
+      if (!target.searchParams.has(key)) {
+        target.searchParams.set(key, value);
+      }
+    });
+
+    return `${target.pathname}${target.search}${location.hash || target.hash || ""}`;
+  }, [location.hash, location.search, to]);
+
+  return <Navigate to={nextUrl} replace />;
+}
+
+RedirectPreserveSearch.propTypes = {
+  to: PropTypes.string.isRequired,
+};
+
 function AppRoutes() {
   return (
     <Routes>
-      {/* Public */}
-      <Route path="/login" element={<LoginPage />} />
+      <Route path="/login" element={<Navigate to="/" replace />} />
       <Route path="/403" element={<ForbiddenPage />} />
 
-      {/* Protected group */}
       <Route element={<RequireAuthLayout />}>
-        {/* Dashboard */}
-        <Route index element={<HomePage />} />
+        <Route index element={<RoleHomeRedirect />} />
+        <Route path="dashboard/overview" element={<DashboardOverviewRedirect />} />
+        <Route path="settings" element={<SettingsPage />} />
 
         {/* Operations */}
         <Route
           path="operations/leaves"
           element={
-            <Perm requiredPermissions={["operations_read"]}>
+            <Access
+              requiredRoles={["RH", "MANAGER", "ADMIN"]}
+              requiredPermissions={["operations_read", "all"]}
+              mode="anyOf"
+            >
               <LeavesPage />
-            </Perm>
+            </Access>
           }
+        />
+        <Route
+          path="operations/absences"
+          element={<Navigate to="/operations/leaves" replace />}
         />
         <Route
           path="operations/time"
           element={
-            <Perm requiredPermissions={["operations_read"]}>
+            <Access
+              requiredRoles={["RH", "MANAGER", "ADMIN"]}
+              requiredPermissions={["operations_read", "all"]}
+              mode="anyOf"
+            >
               <TimePage />
-            </Perm>
+            </Access>
+          }
+        />
+        <Route
+          path="operations/attendance"
+          element={
+            <Access
+              requiredRoles={["RH", "MANAGER", "ADMIN"]}
+              requiredPermissions={["operations_read", "all"]}
+              mode="anyOf"
+            >
+              <AttendancePage />
+            </Access>
           }
         />
         <Route
           path="operations/planning"
           element={
-            <Perm requiredPermissions={["operations_read"]}>
+            <Access
+              requiredRoles={["RH", "MANAGER", "ADMIN"]}
+              requiredPermissions={["operations_read", "all"]}
+              mode="anyOf"
+            >
               <PlanningPage />
-            </Perm>
+            </Access>
           }
         />
         <Route
           path="operations/expenses"
           element={
-            <Perm requiredPermissions={["operations_read"]}>
+            <Access
+              requiredRoles={["RH", "MANAGER", "ADMIN"]}
+              requiredPermissions={["operations_read", "all"]}
+              mode="anyOf"
+            >
               <ExpensesPage />
-            </Perm>
+            </Access>
+          }
+        />
+
+        {/* Requests */}
+        <Route
+          path="requests/hr"
+          element={
+            <Access
+              requiredRoles={["RH", "MANAGER", "ADMIN"]}
+              requiredPermissions={["self_read", "operations_read", "team_read", "admin_read", "all"]}
+              mode="anyOf"
+            >
+              <HrRequestsPage />
+            </Access>
           }
         />
 
@@ -161,99 +254,176 @@ function AppRoutes() {
         <Route
           path="people/directory"
           element={
-            <Perm requiredPermissions={["directory_read"]}>
+            <Access requiredRoles={["RH", "MANAGER", "ADMIN"]} requiredPermissions={["directory_read", "all"]} mode="anyOf">
               <AnnuairePage />
-            </Perm>
+            </Access>
+          }
+        />
+        <Route
+          path="people/contracts"
+          element={
+            <Access requiredRoles={["RH", "MANAGER", "ADMIN"]} requiredPermissions={["directory_read", "all"]} mode="anyOf">
+              <EmployeeContractsPage />
+            </Access>
+          }
+        />
+        <Route
+          path="people/documents"
+          element={
+            <Access requiredRoles={["RH", "MANAGER", "ADMIN", "IT"]} requiredPermissions={["directory_read", "team_read", "all"]} mode="anyOf">
+              <EmployeeDocumentsHubPage />
+            </Access>
+          }
+        />
+        <Route
+          path="employees/documents"
+          element={
+            <Access requiredRoles={["RH", "MANAGER", "ADMIN", "IT"]} requiredPermissions={["directory_read", "team_read", "all"]} mode="anyOf">
+              <RedirectPreserveSearch to="/people/documents" />
+            </Access>
           }
         />
         <Route
           path="people/performance"
           element={
-            <Perm requiredPermissions={["directory_read"]}>
+            <Access requiredRoles={["RH", "MANAGER", "ADMIN"]} requiredPermissions={["directory_read", "all"]} mode="anyOf">
               <PerformancePage />
-            </Perm>
+            </Access>
           }
         />
         <Route
           path="people/performance/:id"
           element={
-            <Perm requiredPermissions={["directory_read"]}>
+            <Access requiredRoles={["RH", "MANAGER", "ADMIN"]} requiredPermissions={["directory_read", "all"]} mode="anyOf">
               <PerformanceDetailPage />
-            </Perm>
+            </Access>
           }
         />
         <Route
           path="people/training"
           element={
-            <Perm requiredPermissions={["directory_read"]}>
+            <Access requiredRoles={["RH", "MANAGER", "ADMIN"]} requiredPermissions={["directory_read", "all"]} mode="anyOf">
               <FormationPage />
-            </Perm>
+            </Access>
           }
         />
 
         {/* Documents */}
-        <Route path="documents/onboarding" element={<OnboardingPage />} />
-        <Route path="documents/offboarding" element={<OffboardingPage />} />
+        <Route
+          path="documents/onboarding"
+          element={
+            <Access requiredRoles={["RH", "ADMIN"]} requiredPermissions={["all"]} mode="anyOf">
+              <OnboardingPage />
+            </Access>
+          }
+        />
+        <Route
+          path="documents/offboarding"
+          element={
+            <Access requiredRoles={["RH", "ADMIN"]} requiredPermissions={["all"]} mode="anyOf">
+              <OffboardingPage />
+            </Access>
+          }
+        />
 
         {/* Resources */}
         <Route
           path="resources/compliance"
           element={
-            <Perm requiredPermissions={["directory_read"]}>
+            <Access requiredRoles={["RH", "ADMIN"]} requiredPermissions={["admin_read", "all"]} mode="anyOf">
               <CompliancePage />
-            </Perm>
+            </Access>
           }
         />
-        <Route
-          path="resources/policies"
-          element={
-            <Perm requiredPermissions={["directory_read"]}>
-              <PoliciesPage />
-            </Perm>
-          }
-        />
+        <Route path="resources/policies" element={<Navigate to="/admin/policies" replace />} />
 
         {/* Analytics */}
         <Route
           path="analytics/reports"
           element={
-            <Perm requiredPermissions={["analytics_read"]}>
+            <Access requiredRoles={["RH", "ADMIN"]} requiredPermissions={["analytics_read", "all"]} mode="anyOf">
               <AnalyticsReportsPage />
-            </Perm>
+            </Access>
           }
         />
         <Route
           path="analytics/dashboards"
           element={
-            <Perm requiredPermissions={["analytics_read"]}>
+            <Access requiredRoles={["RH", "ADMIN"]} requiredPermissions={["analytics_read", "all"]} mode="anyOf">
               <AnalyticsDashboardsPage />
-            </Perm>
+            </Access>
           }
         />
 
-        {/* Admin */}
+        {/* Administration (new) */}
         <Route
-          path="admin/structure"
+          path="admin/organization"
           element={
-            <Perm requiredPermissions={["admin_read"]}>
+            <Access requiredRoles={["RH", "ADMIN"]} requiredPermissions={["admin_read", "all"]} mode="anyOf">
               <AdminStructurePage />
-            </Perm>
+            </Access>
           }
         />
         <Route
-          path="admin/permissions"
+          path="admin/roles-permissions"
           element={
-            <Perm requiredPermissions={["admin_read"]}>
+            <Access requiredRoles={["RH", "ADMIN"]} requiredPermissions={["admin_read", "all"]} mode="anyOf">
               <AdminPermissionsPage />
-            </Perm>
+            </Access>
           }
         />
+        <Route
+          path="admin/workflows"
+          element={
+            <Access requiredRoles={["RH", "ADMIN"]} requiredPermissions={["admin_read", "all"]} mode="anyOf">
+              <AdminWorkflowsPage />
+            </Access>
+          }
+        />
+        <Route
+          path="admin/policies"
+          element={
+            <Access requiredRoles={["RH", "ADMIN"]} requiredPermissions={["admin_read", "all"]} mode="anyOf">
+              <PoliciesPage />
+            </Access>
+          }
+        />
+        <Route
+          path="admin/audit-log"
+          element={
+            <Access requiredRoles={["RH", "ADMIN"]} requiredPermissions={["admin_read", "all"]} mode="anyOf">
+              <AdminAuditLogPage />
+            </Access>
+          }
+        />
+
+        {/* Legacy admin aliases */}
+        <Route path="admin/structure" element={<Navigate to="/admin/organization" replace />} />
+        <Route path="admin/permissions" element={<Navigate to="/admin/roles-permissions" replace />} />
         <Route
           path="admin/integrations"
           element={
-            <Perm requiredPermissions={["admin_read"]}>
+            <Access requiredRoles={["RH", "ADMIN"]} requiredPermissions={["admin_read", "all"]} mode="anyOf">
               <AdminIntegrationsPage />
-            </Perm>
+            </Access>
+          }
+        />
+
+        {/* Keep old resource pages reachable by explicit compatibility routes if needed */}
+        <Route
+          path="_legacy/resources/compliance"
+          element={
+            <Access requiredRoles={["RH", "ADMIN"]} requiredPermissions={["all"]} mode="anyOf">
+              <CompliancePage />
+            </Access>
+          }
+        />
+        <Route
+          path="_legacy/resources/policies"
+          element={
+            <Access requiredRoles={["RH", "ADMIN"]} requiredPermissions={["admin_read", "all"]} mode="anyOf">
+              <PoliciesPage />
+            </Access>
           }
         />
 
@@ -268,27 +438,23 @@ function AppRoutes() {
         />
         <Route
           path="manager/team-overview"
-          element={
-            <RolePerm requiredRole="Manager" requiredPermissions={["team_read"]}>
-              <ManagerTeamOverviewPage />
-            </RolePerm>
-          }
+          element={<Navigate to="/manager/dashboard" replace />}
         />
         <Route
           path="manager/approvals"
           element={
-            <RolePerm requiredRole="Manager" requiredPermissions={["approvals_read"]}>
-              <TeamApprovalsPage />
+            <RolePerm requiredRole="Manager" requiredPermissions={["team_read"]}>
+              <ManagerApprovalsPage />
             </RolePerm>
           }
         />
         <Route
+          path="manager/approvals-manager"
+          element={<Navigate to="/manager/approvals" replace />}
+        />
+        <Route
           path="manager/performance"
-          element={
-            <RolePerm requiredRole="Manager" requiredPermissions={["team_read"]}>
-              <ManagerPerformancePage />
-            </RolePerm>
-          }
+          element={<Navigate to="/manager/dashboard" replace />}
         />
 
         {/* Employee self-service */}
@@ -309,10 +475,50 @@ function AppRoutes() {
           }
         />
         <Route
-          path="employee/documents"
+          path="employee/time"
+          element={
+            <RolePerm requiredRole="Employee" requiredPermissions={["self_read"]}>
+              <EmployeeTimeAbsencesPage />
+            </RolePerm>
+          }
+        />
+        <Route
+          path="employee/performance"
+          element={
+            <RolePerm requiredRole="Employee" requiredPermissions={["self_read"]}>
+              <EmployeePerformancePage />
+            </RolePerm>
+          }
+        />
+        <Route
+          path="employee/trainings"
+          element={
+            <RolePerm requiredRole="Employee" requiredPermissions={["self_read"]}>
+              <EmployeeTrainingsPage />
+            </RolePerm>
+          }
+        />
+        <Route
+          path="employee/pay-documents"
           element={
             <RolePerm requiredRole="Employee" requiredPermissions={["self_read"]}>
               <EmployeeDocumentsPage />
+            </RolePerm>
+          }
+        />
+        <Route
+          path="employee/documents"
+          element={
+            <RolePerm requiredRole="Employee" requiredPermissions={["self_read"]}>
+              <RedirectPreserveSearch to="/employee/pay-documents" />
+            </RolePerm>
+          }
+        />
+        <Route
+          path="employee/indicators"
+          element={
+            <RolePerm requiredRole="Employee" requiredPermissions={["self_read"]}>
+              <EmployeeIndicatorsPage />
             </RolePerm>
           }
         />
@@ -325,21 +531,49 @@ function AppRoutes() {
           }
         />
         <Route
+          path="employee/help"
+          element={
+            <RolePerm requiredRole="Employee" requiredPermissions={["self_read"]}>
+              <EmployeeHelpPage />
+            </RolePerm>
+          }
+        />
+        <Route
           path="me/payslips"
           element={
             <RolePerm requiredRole="Employee" requiredPermissions={["self_read"]}>
-              <MyPayslipsPage />
+              <RedirectPreserveSearch to="/employee/pay-documents?tab=payroll" />
+            </RolePerm>
+          }
+        />
+        <Route
+          path="employee/payslips"
+          element={
+            <RolePerm requiredRole="Employee" requiredPermissions={["self_read"]}>
+              <RedirectPreserveSearch to="/employee/pay-documents?tab=payroll" />
             </RolePerm>
           }
         />
 
-        {/* RH exclusif */}
+        {/* RH exclusive */}
         <Route
           path="hr/workforce-planning"
           element={
             <RolePerm requiredRole="RH" requiredPermissions={["directory_read"]}>
               <HrWorkforcePlanningPage />
             </RolePerm>
+          }
+        />
+        <Route
+          path="hr/dashboard"
+          element={
+            <Access
+              requiredRoles={["RH", "ADMIN"]}
+              requiredPermissions={["directory_read", "admin_read", "all"]}
+              mode="anyOf"
+            >
+              <HrDashboardPage />
+            </Access>
           }
         />
         <Route
@@ -351,21 +585,21 @@ function AppRoutes() {
           }
         />
 
-        {/* RH */}
+        {/* RH list/edit */}
         <Route
           path="employee"
           element={
-            <Perm requiredPermissions={["directory_read"]}>
-              <EmployeeListPage />
-            </Perm>
+            <Access requiredRoles={["RH", "MANAGER", "ADMIN"]} requiredPermissions={["directory_read", "all"]} mode="anyOf">
+              <Navigate to="/people/directory" replace />
+            </Access>
           }
         />
         <Route
           path="employee/:id/edit"
           element={
-            <Perm requiredPermissions={["directory_read"]}>
+            <Access requiredRoles={["RH", "MANAGER", "ADMIN"]} requiredPermissions={["directory_read", "all"]} mode="anyOf">
               <EmployeeEditPage />
-            </Perm>
+            </Access>
           }
         />
 
@@ -375,8 +609,8 @@ function AppRoutes() {
           element={
             <div className="p-6">
               <div className="text-center py-12">
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">Page en construction</h2>
-                <p className="text-gray-600">Cette page sera bientôt disponible.</p>
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">Page indisponible</h2>
+                <p className="text-gray-600">Ce module n&apos;est pas encore accessible sur votre espace actuel.</p>
               </div>
             </div>
           }

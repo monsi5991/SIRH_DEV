@@ -8,6 +8,13 @@ import { useApp } from "../../contexts/AppContext";
 import EventFormDialog from "../../components/operations/EventFormDialog";
 import { kpiStart, kpiSuccess, kpiError } from "../../lib/kpiTracker";
 
+function eventTypeLabel(type) {
+  if (type === "meeting") return "Reunion";
+  if (type === "training") return "Formation";
+  if (type === "deadline") return "Echeance";
+  return "Autre";
+}
+
 export default function PlanningPage() {
   const { formatDate } = useApp();
   const [events, setEvents] = useState([]);
@@ -57,14 +64,17 @@ export default function PlanningPage() {
   return (
     <div className="p-6 space-y-6 table-page">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Planning</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Planning</h1>
+          <p className="text-sm text-gray-600">Centralisez les reunions RH, formations, echeances et temps forts multisites.</p>
+        </div>
         <div className="flex items-center gap-2">
           <select className="border rounded px-2 py-1" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
             <option value="">Tous types</option>
-            <option value="meeting">meeting</option>
-            <option value="training">training</option>
-            <option value="deadline">deadline</option>
-            <option value="other">other</option>
+            <option value="meeting">Reunion</option>
+            <option value="training">Formation</option>
+            <option value="deadline">Echeance</option>
+            <option value="other">Autre</option>
           </select>
           <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => setOpenForm(true)}>
             <Plus className="w-4 h-4 mr-2" /> Ajouter
@@ -89,13 +99,13 @@ export default function PlanningPage() {
                     <div className="text-xs text-gray-500">{ev.description || ""}</div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline">{ev.type}</Badge>
+                    <Badge variant="outline">{eventTypeLabel(ev.type)}</Badge>
                     <Button size="sm" variant="outline" onClick={() => remove(ev.id)} className="text-gray-600"><Trash2 className="w-4 h-4" /></Button>
                   </div>
                 </div>
               ))}
             </div>
-          ) : <p className="text-sm text-gray-500">Aucun événement.</p>}
+          ) : <p className="text-sm text-gray-500">Aucun evenement planifie.</p>}
         </CardContent>
       </Card>
 

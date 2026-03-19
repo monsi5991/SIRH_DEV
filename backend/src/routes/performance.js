@@ -2,12 +2,20 @@
 import express from "express";
 import { prisma } from "../prisma.js";
 import { z } from "zod";
+import { requirePermissions } from "../rbac.js";
+import {
+  buildEmployeeScopeWhere,
+  canAccessEmployeeId,
+  resolveAccessContext,
+} from "../lib/accessScope.js";
 
 const router = express.Router();
 
 // Permet d'accepter auth middleware, user hydraté ou entête x-tenant-id (dev)
 const getTenantId = (req) =>
   req.auth?.tid || req.user?.tenantId || req.headers["x-tenant-id"];
+
+router.use(requirePermissions(["team_read", "all"], "anyOf"));
 
 /* --------------------------------- Schemas --------------------------------- */
 
@@ -33,6 +41,7 @@ const GoalCreate = z.object({
 
 router.get("/cycles", async (req, res) => {
   const tenantId = getTenantId(req);
+  if (!tenantId) return res.status(401).json({ message: "Unauthorized" });
   const cycles = await prisma.reviewCycle.findMany({
     where: { tenantId },
     orderBy: { startDate: "desc" },
@@ -40,7 +49,7 @@ router.get("/cycles", async (req, res) => {
   res.json(cycles);
 });
 
-router.post("/cycles", async (req, res) => {
+router.post("/cycles", requirePermissions(["all"], "anyOf"), async (req, res) => {
   try {
     const tenantId = getTenantId(req);
     const p = CycleCreate.parse(req.body);
@@ -63,9 +72,18 @@ router.post("/cycles", async (req, res) => {
 // Liste des objectifs (avec un minimum de données liées pour l'UI/CSV)
 router.get("/goals", async (req, res) => {
   const tenantId = getTenantId(req);
-  const { employeeId } = req.query;
+  if (!tenantId) return res.status(401).json({ message: "Unauthorized" });
+  const accessContext = await resolveAccessContext(req);
+  const employeeId = req.query.employeeId ? String(req.query.employeeId) : null;
+  if (employeeId && !canAccessEmployeeId(accessContext, employeeId)) {
+    return res.status(403).json({ message: "Forbidden" });
+  }
 
-  const where = { tenantId, ...(employeeId ? { employeeId } : {}) };
+  const where = {
+    tenantId,
+    ...buildEmployeeScopeWhere(accessContext, { field: "employeeId" }),
+    ...(employeeId ? { employeeId } : {}),
+  };
 
   const goals = await prisma.goal.findMany({
     where,
@@ -86,6 +104,8 @@ router.get("/goals", async (req, res) => {
 // Détail d'un objectif
 router.get("/goals/:id", async (req, res) => {
   const tenantId = getTenantId(req);
+  if (!tenantId) return res.status(401).json({ message: "Unauthorized" });
+  const accessContext = await resolveAccessContext(req);
   const { id } = req.params;
 
   const goal = await prisma.goal.findFirst({
@@ -99,14 +119,30 @@ router.get("/goals/:id", async (req, res) => {
   });
 
   if (!goal) return res.status(404).json({ message: "Goal not found" });
+  if (!canAccessEmployeeId(accessContext, goal.employeeId)) {
+    return res.status(403).json({ message: "Forbidden" });
+  }
   res.json(goal);
 });
 
 // Création
-router.post("/goals", async (req, res) => {
+router.post("/goals", requirePermissions(["all"], "anyOf"), async (req, res) => {
   try {
     const tenantId = getTenantId(req);
     const p = GoalCreate.parse(req.body);
+    const employee = await prisma.employee.findFirst({
+      where: { id: p.employeeId, tenantId },
+      select: { id: true },
+    });
+    if (!employee) return res.status(404).json({ message: "Employee not found" });
+
+    if (p.cycleId) {
+      const cycle = await prisma.reviewCycle.findFirst({
+        where: { id: p.cycleId, tenantId },
+        select: { id: true },
+      });
+      if (!cycle) return res.status(404).json({ message: "Cycle not found" });
+    }
 
     const g = await prisma.goal.create({
       data: {
@@ -128,7 +164,7 @@ router.post("/goals", async (req, res) => {
 });
 
 // Mise à jour (vérifie tenant)
-router.put("/goals/:id", async (req, res) => {
+router.put("/goals/:id", requirePermissions(["all"], "anyOf"), async (req, res) => {
   try {
     const tenantId = getTenantId(req);
     const { id } = req.params;
@@ -137,6 +173,21 @@ router.put("/goals/:id", async (req, res) => {
     // Vérifier que l'objectif appartient bien au tenant
     const exists = await prisma.goal.findFirst({ where: { id, tenantId } });
     if (!exists) return res.status(404).json({ message: "Goal not found" });
+
+    if (p.employeeId) {
+      const employee = await prisma.employee.findFirst({
+        where: { id: p.employeeId, tenantId },
+        select: { id: true },
+      });
+      if (!employee) return res.status(404).json({ message: "Employee not found" });
+    }
+    if (p.cycleId) {
+      const cycle = await prisma.reviewCycle.findFirst({
+        where: { id: p.cycleId, tenantId },
+        select: { id: true },
+      });
+      if (!cycle) return res.status(404).json({ message: "Cycle not found" });
+    }
 
     const g = await prisma.goal.update({
       where: { id },
@@ -154,7 +205,7 @@ router.put("/goals/:id", async (req, res) => {
 });
 
 // Suppression (vérifie tenant)
-router.delete("/goals/:id", async (req, res) => {
+router.delete("/goals/:id", requirePermissions(["all"], "anyOf"), async (req, res) => {
   try {
     const tenantId = getTenantId(req);
     const { id } = req.params;

@@ -20,6 +20,7 @@ export const useAuth = () => {
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
+  const [error, setError] = useState("");
 
   // ✅ état d’init Keycloak + chargement /me
   const [kcReady, setKcReady] = useState(false);
@@ -39,6 +40,7 @@ export function AuthProvider({ children }) {
   const loadMe = useCallback(async () => {
     const me = await api.get("/me");
     setUser(normalizeUser(me.user));
+    setError("");
   }, [normalizeUser]);
 
   // ✅ BOOT: init Keycloak, puis /me si authentifié
@@ -58,13 +60,15 @@ export function AuthProvider({ children }) {
           await loadMe();
         } else {
           setUser(null);
+          setError("");
         }
       } catch (e) {
         console.warn("Auth boot failed:", e);
         if (mounted) {
           setKcReady(true);
-          setKcAuthenticated(false);
+          setKcAuthenticated(!!keycloak.authenticated);
           setUser(null);
+          setError(e?.message || "Impossible de charger votre profil SIRH.");
         }
       } finally {
         if (mounted) setLoading(false);
@@ -86,22 +90,34 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = useCallback(async () => {
+    setError("");
     await initKeycloakOnce();
     await keycloak.login({ redirectUri: window.location.origin + "/" });
   }, []);
 
   const logout = useCallback(async () => {
     try {
-      await keycloak.logout({ redirectUri: window.location.origin + "/login" });
+      await keycloak.logout({ redirectUri: window.location.origin + "/" });
     } finally {
       setUser(null);
+      setError("");
       setKcAuthenticated(false);
     }
   }, []);
 
   const refreshUserFromApi = useCallback(async () => {
     if (!keycloak.authenticated) return;
-    await loadMe();
+    setLoading(true);
+    try {
+      await loadMe();
+      setKcAuthenticated(true);
+    } catch (e) {
+      setUser(null);
+      setError(e?.message || "Impossible de charger votre profil SIRH.");
+      throw e;
+    } finally {
+      setLoading(false);
+    }
   }, [loadMe]);
 
   const hasRole = useCallback(
@@ -144,6 +160,7 @@ export function AuthProvider({ children }) {
       kcReady,
       kcAuthenticated,
       isAuthenticated,
+      error,
       token: keycloak.token,
 
       login,
@@ -160,6 +177,7 @@ export function AuthProvider({ children }) {
       kcReady,
       kcAuthenticated,
       isAuthenticated,
+      error,
       refreshUserFromApi,
       login,
       logout,

@@ -1,10 +1,13 @@
 // frontend/src/pages/employee/MyPayslipsPage.js
 import React, { useEffect, useState } from "react";
 import { get } from "../../lib/api";
+import { openSecureFileUrl } from "../../lib/secureFiles";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
+import usePageMeta from "../../hooks/usePageMeta";
 
 export default function MyPayslipsPage() {
+  usePageMeta("Mes bulletins de paie", "Consultez vos bulletins publiés et votre aperçu de paie sur la période choisie.");
   const [period, setPeriod] = useState(new Date().toISOString().slice(0, 7));
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -94,7 +97,7 @@ export default function MyPayslipsPage() {
                 </div>
               </div>
               <div>
-                <div className="text-gray-500">Cotisations (IPRES+CSS)</div>
+                <div className="text-gray-500">Cotisations sociales</div>
                 <div className="font-semibold">
                   {fmt((preview.result.ipres ?? 0) + (preview.result.css ?? 0))} {preview.result.currency}
                 </div>
@@ -132,14 +135,13 @@ export default function MyPayslipsPage() {
                       Publié le {new Date(i.createdAt).toLocaleString()}
                     </div>
                   </div>
-                  <a
+                  <button
+                    type="button"
                     className="text-blue-600 underline"
-                    href={i.url}
-                    target="_blank"
-                    rel="noreferrer"
+                    onClick={() => openSecureFileUrl(i.url)}
                   >
                     Télécharger
-                  </a>
+                  </button>
                 </li>
               ))}
               {!items.length && !loading && !noEmployee && (

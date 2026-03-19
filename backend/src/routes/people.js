@@ -5,8 +5,19 @@ import { z } from "zod";
 import multer from "multer";
 import fs from "fs";
 import path from "path";
+import { requirePermissions } from "../rbac.js";
+import { logAuditEvent } from "../lib/audit.js";
+import { createEmployeeDocument } from "../lib/employeeDocuments.js";
+import {
+  buildEmployeeScopeWhere,
+  canAccessEmployeeId,
+  resolveAccessContext,
+} from "../lib/accessScope.js";
 
 const router = express.Router();
+
+// Lecture annuaire requise par défaut
+router.use(requirePermissions(["directory_read"], "anyOf"));
 
 /* ============================================
  * Tenant helper : req.auth.tenantId | req.auth.tid | req.user.tenantId | X-Tenant-Id
@@ -17,6 +28,35 @@ const getTenantId = (req) =>
   req.user?.tenantId ||
   req.headers["x-tenant-id"] ||
   null;
+
+async function hasAllPermission(req) {
+  if (typeof req.__hasAllPermission === "boolean") {
+    return req.__hasAllPermission;
+  }
+
+  const tenantId = getTenantId(req);
+  const userId = req.auth?.sub;
+  if (!tenantId || !userId) {
+    req.__hasAllPermission = false;
+    return false;
+  }
+
+  const row = await prisma.userRole.findFirst({
+    where: {
+      userId,
+      role: {
+        tenantId,
+        rolePermissions: {
+          some: { permission: { name: "all" } },
+        },
+      },
+    },
+    select: { userId: true },
+  });
+
+  req.__hasAllPermission = !!row;
+  return req.__hasAllPermission;
+}
 
 /* ============================================
  * Stockage fichiers (documents RH)
@@ -32,7 +72,23 @@ const storage = multer.diskStorage({
     cb(null, `${ts}_${safe}`);
   },
 });
-const upload = multer({ storage });
+const MAX_UPLOAD_MB = Number(process.env.MAX_UPLOAD_SIZE_MB || 10);
+const ALLOWED_UPLOAD_MIME_TYPES = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+]);
+const upload = multer({
+  storage,
+  limits: { fileSize: MAX_UPLOAD_MB * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (ALLOWED_UPLOAD_MIME_TYPES.has(file.mimetype)) return cb(null, true);
+    return cb(new Error("unsupported_file_type"));
+  },
+});
 
 /* ============================================
  * Validations
@@ -107,6 +163,13 @@ const toBoolean = (v) => {
   return Boolean(v);
 };
 
+const valueEquals = (a, b) => {
+  if (a instanceof Date && b instanceof Date) return a.getTime() === b.getTime();
+  if (a instanceof Date && typeof b === "string") return a.getTime() === new Date(b).getTime();
+  if (b instanceof Date && typeof a === "string") return b.getTime() === new Date(a).getTime();
+  return a === b;
+};
+
 /* =========================================================
  *      LIST employees
  * ========================================================= */
@@ -114,6 +177,8 @@ router.get("/employees", async (req, res) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(401).json({ message: "Unauthorized" });
+    const accessContext = await resolveAccessContext(req);
+    const canSeePayroll = await hasAllPermission(req);
 
     const {
       q = "",
@@ -130,6 +195,7 @@ router.get("/employees", async (req, res) => {
 
     const where = {
       tenantId,
+      ...buildEmployeeScopeWhere(accessContext, { field: "id" }),
       AND: [
         country ? { country } : {},
         department ? { department } : {},
@@ -149,6 +215,39 @@ router.get("/employees", async (req, res) => {
       ],
     };
 
+    const select = {
+      id: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+      phone: true,
+      country: true,
+      department: true,
+      site: true,
+      position: true,
+      status: true,
+      joinDate: true,
+      endDate: true,
+      contractType: true,
+      managerId: true,
+      manager: { select: { id: true, firstName: true, lastName: true } },
+      cnss: true,
+      ipres: true,
+    };
+    if (canSeePayroll) {
+      Object.assign(select, {
+        internalMatricule: true,
+        baseSalary: true,
+        isCadre: true,
+        atRate: true,
+        familyParts: true,
+        transportTaxable: true,
+        bankName: true,
+        bankIban: true,
+        bankAccount: true,
+      });
+    }
+
     const [total, items] = await Promise.all([
       prisma.employee.count({ where }),
       prisma.employee.findMany({
@@ -156,31 +255,7 @@ router.get("/employees", async (req, res) => {
         orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
         skip: (p - 1) * ps,
         take: ps,
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          email: true,
-          phone: true,
-          country: true,
-          department: true,
-          site: true,
-          position: true,
-          status: true,
-          joinDate: true,
-          cnss: true,
-          ipres: true,
-          // --- Champs Paie visibles dans la liste
-          internalMatricule: true,
-          baseSalary: true,
-          isCadre: true,
-          atRate: true,
-          familyParts: true,
-          transportTaxable: true,
-          bankName: true,
-          bankIban: true,
-          bankAccount: true,
-        },
+        select,
       }),
     ]);
 
@@ -198,17 +273,90 @@ router.get("/employees/:id", async (req, res) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(401).json({ message: "Unauthorized" });
+    const accessContext = await resolveAccessContext(req);
+    const canSeePayroll = await hasAllPermission(req);
+    if (!canAccessEmployeeId(accessContext, req.params.id)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const select = {
+      id: true,
+      tenantId: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+      phone: true,
+      phoneWhatsApp: true,
+      country: true,
+      department: true,
+      site: true,
+      position: true,
+      status: true,
+      joinDate: true,
+      endDate: true,
+      contractType: true,
+      cnss: true,
+      ipres: true,
+      managerId: true,
+      manager: { select: { id: true, firstName: true, lastName: true } },
+      documents: {
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          label: true,
+          type: true,
+          url: true,
+          expiresAt: true,
+          createdAt: true,
+        },
+      },
+      activities: {
+        orderBy: { when: "desc" },
+        take: 10,
+        select: {
+          id: true,
+          title: true,
+          when: true,
+        },
+      },
+      goals: {
+        orderBy: { updatedAt: "desc" },
+        take: 5,
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          progress: true,
+          updatedAt: true,
+        },
+      },
+      certifications: {
+        orderBy: { expiresAt: "asc" },
+        select: {
+          id: true,
+          name: true,
+          issuedAt: true,
+          expiresAt: true,
+        },
+      },
+    };
+    if (canSeePayroll) {
+      Object.assign(select, {
+        internalMatricule: true,
+        baseSalary: true,
+        isCadre: true,
+        atRate: true,
+        familyParts: true,
+        transportTaxable: true,
+        bankName: true,
+        bankIban: true,
+        bankAccount: true,
+      });
+    }
 
     const emp = await prisma.employee.findFirst({
       where: { id: req.params.id, tenantId },
-      include: {
-        manager: { select: { id: true, firstName: true, lastName: true } },
-        documents: { orderBy: { createdAt: "desc" } },
-        activities: { orderBy: { when: "desc" }, take: 10 },
-        goals: { orderBy: { updatedAt: "desc" }, take: 5 },
-        certifications: { orderBy: { expiresAt: "asc" } },
-      },
-      // On pourrait aussi utiliser select, mais include conserve la compat rétro.
+      select,
     });
     if (!emp) return res.status(404).json({ message: "Introuvable" });
     res.json(emp);
@@ -221,12 +369,21 @@ router.get("/employees/:id", async (req, res) => {
 /* =========================================================
  *      CREATE employee
  * ========================================================= */
-router.post("/employees", async (req, res) => {
+router.post("/employees", requirePermissions(["all"], "anyOf"), async (req, res) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(401).json({ message: "Unauthorized" });
 
     const payload = EmployeeCreate.parse(req.body);
+    if (payload.managerId) {
+      const manager = await prisma.employee.findFirst({
+        where: { id: payload.managerId, tenantId },
+        select: { id: true },
+      });
+      if (!manager) {
+        return res.status(400).json({ message: "managerId invalide pour ce tenant" });
+      }
+    }
 
     const created = await prisma.employee.create({
       data: {
@@ -269,6 +426,23 @@ router.post("/employees", async (req, res) => {
         bankAccount: payload.bankAccount || null,
       },
     });
+
+    await logAuditEvent({
+      tenantId,
+      actorId: req.auth?.sub || null,
+      type: "EMPLOYEE_CREATE",
+      entity: "employee",
+      entityId: created.id,
+      payload: {
+        email: created.email,
+        department: created.department,
+        site: created.site,
+        status: created.status,
+      },
+      ip: req.ip,
+      ua: req.get("user-agent"),
+    });
+
     res.status(201).json(created);
   } catch (e) {
     if (e.name === "ZodError")
@@ -281,10 +455,10 @@ router.post("/employees", async (req, res) => {
 });
 
 /* =========================================================
- *      UPDATE employee (PUT = full, mais on accepte du partiel)
+ *      UPDATE employee (PUT/PATCH = partiel accepté)
  *      + expose les champs paie
  * ========================================================= */
-router.put("/employees/:id", async (req, res) => {
+async function updateEmployeeHandler(req, res) {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(401).json({ message: "Unauthorized" });
@@ -340,10 +514,58 @@ router.put("/employees/:id", async (req, res) => {
         payload.bankAccount === undefined ? undefined : payload.bankAccount || null,
     };
 
+    const exists = await prisma.employee.findFirst({
+      where: { id: req.params.id, tenantId },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+        country: true,
+        department: true,
+        site: true,
+        position: true,
+        status: true,
+        joinDate: true,
+        endDate: true,
+        contractType: true,
+        managerId: true,
+      },
+    });
+    if (!exists) return res.status(404).json({ message: "Introuvable" });
+
+    if (payload.managerId) {
+      const manager = await prisma.employee.findFirst({
+        where: { id: payload.managerId, tenantId },
+        select: { id: true },
+      });
+      if (!manager) {
+        return res.status(400).json({ message: "managerId invalide pour ce tenant" });
+      }
+    }
+
     const updated = await prisma.employee.update({
       where: { id: req.params.id },
       data,
     });
+
+    const changedFields = Object.entries(data)
+      .filter(([, value]) => value !== undefined)
+      .filter(([key, value]) => !valueEquals(exists[key], value))
+      .map(([key]) => key);
+
+    await logAuditEvent({
+      tenantId,
+      actorId: req.auth?.sub || null,
+      type: "EMPLOYEE_UPDATE",
+      entity: "employee",
+      entityId: updated.id,
+      payload: { changedFields },
+      ip: req.ip,
+      ua: req.get("user-agent"),
+    });
+
     res.json(updated);
   } catch (e) {
     if (e.code === "P2025")
@@ -355,17 +577,42 @@ router.put("/employees/:id", async (req, res) => {
     console.error(e);
     res.status(500).json({ message: "Erreur serveur" });
   }
-});
+}
+
+router.put("/employees/:id", requirePermissions(["all"], "anyOf"), updateEmployeeHandler);
+router.patch("/employees/:id", requirePermissions(["all"], "anyOf"), updateEmployeeHandler);
 
 /* =========================================================
  *      DELETE employee
  * ========================================================= */
-router.delete("/employees/:id", async (req, res) => {
+router.delete("/employees/:id", requirePermissions(["all"], "anyOf"), async (req, res) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(401).json({ message: "Unauthorized" });
 
+    const exists = await prisma.employee.findFirst({
+      where: { id: req.params.id, tenantId },
+      select: { id: true, email: true, department: true, status: true },
+    });
+    if (!exists) return res.status(404).json({ message: "Introuvable" });
+
     await prisma.employee.delete({ where: { id: req.params.id } });
+
+    await logAuditEvent({
+      tenantId,
+      actorId: req.auth?.sub || null,
+      type: "EMPLOYEE_DELETE",
+      entity: "employee",
+      entityId: exists.id,
+      payload: {
+        email: exists.email,
+        department: exists.department,
+        status: exists.status,
+      },
+      ip: req.ip,
+      ua: req.get("user-agent"),
+    });
+
     res.json({ ok: true });
   } catch (e) {
     if (e.code === "P2025")
@@ -380,32 +627,58 @@ router.delete("/employees/:id", async (req, res) => {
  * ========================================================= */
 router.post(
   "/employees/:id/documents",
+  requirePermissions(["all"], "anyOf"),
   upload.single("file"),
   async (req, res) => {
     try {
       const tenantId = getTenantId(req);
       if (!tenantId) return res.status(401).json({ message: "Unauthorized" });
-      if (!req.file) return res.status(400).json({ message: "Fichier manquant" });
-
       const meta = DocCreate.parse(req.body);
-      const url = `/uploads/${req.file.filename}`;
 
-      const doc = await prisma.document.create({
-        data: {
-          tenantId,
-          employeeId: req.params.id,
-          label: meta.label,
-          type: meta.type || null,
-          url,
-          expiresAt: meta.expiresAt ? new Date(meta.expiresAt) : null,
-        },
+      const doc = await createEmployeeDocument({
+        tenantId,
+        employeeId: req.params.id,
+        file: req.file,
+        label: meta.label,
+        type: meta.type || null,
+        expiresAt: meta.expiresAt || null,
       });
+
+      await logAuditEvent({
+        tenantId,
+        actorId: req.auth?.sub || null,
+        type: "DOCUMENT_UPLOAD",
+        entity: "document",
+        entityId: doc.id,
+        payload: {
+          employeeId: doc.employeeId,
+          label: doc.label,
+          type: doc.type,
+        },
+        ip: req.ip,
+        ua: req.get("user-agent"),
+      });
+
       res.status(201).json(doc);
     } catch (e) {
       if (e.name === "ZodError")
         return res
           .status(400)
           .json({ message: "Données invalides", issues: e.issues });
+      if (e instanceof multer.MulterError && e.code === "LIMIT_FILE_SIZE") {
+        return res.status(400).json({
+          message: `Fichier trop volumineux. Taille max: ${MAX_UPLOAD_MB} Mo.`,
+          error: "file_too_large",
+        });
+      }
+      if (e?.message === "unsupported_file_type") {
+        return res.status(400).json({
+          message: "Type de fichier non autorisé. Utilisez PDF, JPG, PNG, WEBP, DOC ou DOCX.",
+          error: "unsupported_file_type",
+        });
+      }
+      if (e?.status)
+        return res.status(e.status).json({ message: e.message, error: e.code || null });
       console.error(e);
       res.status(500).json({ message: "Erreur serveur" });
     }
@@ -415,16 +688,38 @@ router.post(
 /* =========================================================
  *      DELETE employee doc
  * ========================================================= */
-router.delete("/documents/:docId", async (req, res) => {
+router.delete("/documents/:docId", requirePermissions(["all"], "anyOf"), async (req, res) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(401).json({ message: "Unauthorized" });
+
+    const existing = await prisma.document.findFirst({
+      where: { id: req.params.docId, tenantId },
+      select: { id: true, url: true, employeeId: true, label: true, type: true },
+    });
+    if (!existing) return res.status(404).json({ message: "Introuvable" });
 
     const doc = await prisma.document.delete({ where: { id: req.params.docId } });
     const filePath = path.join(uploadDir, path.basename(doc.url || ""));
     if (doc.url && fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
     }
+
+    await logAuditEvent({
+      tenantId,
+      actorId: req.auth?.sub || null,
+      type: "DOCUMENT_DELETE",
+      entity: "document",
+      entityId: existing.id,
+      payload: {
+        employeeId: existing.employeeId,
+        label: existing.label,
+        type: existing.type,
+      },
+      ip: req.ip,
+      ua: req.get("user-agent"),
+    });
+
     res.json({ ok: true });
   } catch (e) {
     if (e.code === "P2025")
@@ -443,10 +738,12 @@ router.get("/counters/directory", async (req, res) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(401).json({ message: "Unauthorized" });
+    const accessContext = await resolveAccessContext(req);
 
     const profilesIncomplete = await prisma.employee.count({
       where: {
         tenantId,
+        ...buildEmployeeScopeWhere(accessContext, { field: "id" }),
         OR: [{ phone: null }, { department: null }, { position: null }],
       },
     });
@@ -455,6 +752,7 @@ router.get("/counters/directory", async (req, res) => {
     const docsExpiring = await prisma.certification.count({
       where: {
         tenantId,
+        ...buildEmployeeScopeWhere(accessContext, { field: "employeeId" }),
         expiresAt: { lte: soon, gte: new Date() },
       },
     });
@@ -475,20 +773,27 @@ router.get("/counters/performance", async (req, res) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(401).json({ message: "Unauthorized" });
+    const accessContext = await resolveAccessContext(req);
 
     const goalsPending = await prisma.goal.count({
       where: {
         tenantId,
+        ...buildEmployeeScopeWhere(accessContext, { field: "employeeId" }),
         NOT: { status: "completed" },
       },
     });
 
-    const reviewsDue = await prisma.reviewCycle.count({
-      where: {
-        tenantId,
-        goals: { some: { NOT: { status: "completed" } } },
-      },
-    });
+    let reviewsDue = 0;
+    if (accessContext.scope === "COMPANY") {
+      reviewsDue = await prisma.reviewCycle.count({
+        where: {
+          tenantId,
+          goals: { some: { NOT: { status: "completed" } } },
+        },
+      });
+    } else {
+      reviewsDue = goalsPending;
+    }
 
     res.json({
       goalsPending,
@@ -506,22 +811,35 @@ router.get("/counters/training", async (req, res) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(401).json({ message: "Unauthorized" });
+    const accessContext = await resolveAccessContext(req);
 
     const soon = new Date(Date.now() + 30 * 24 * 3600 * 1000);
     const certsExpiring = await prisma.certification.count({
       where: {
         tenantId,
+        ...buildEmployeeScopeWhere(accessContext, { field: "employeeId" }),
         expiresAt: { lte: soon, gte: new Date() },
       },
     });
 
     const twoWeeks = new Date(Date.now() + 14 * 24 * 3600 * 1000);
-    const sessionsSoon = await prisma.session.count({
-      where: {
-        tenantId,
-        startDate: { gte: new Date(), lte: twoWeeks },
-      },
-    });
+    let sessionsSoon = 0;
+    if (accessContext.scope === "COMPANY") {
+      sessionsSoon = await prisma.session.count({
+        where: {
+          tenantId,
+          startDate: { gte: new Date(), lte: twoWeeks },
+        },
+      });
+    } else {
+      sessionsSoon = await prisma.enrollment.count({
+        where: {
+          tenantId,
+          ...buildEmployeeScopeWhere(accessContext, { field: "employeeId" }),
+          session: { startDate: { gte: new Date(), lte: twoWeeks } },
+        },
+      });
+    }
 
     res.json({
       certsExpiring,

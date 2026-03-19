@@ -5,6 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { toast } from 'sonner';
+import PageHeader from '../../components/common/PageHeader';
+import SectionCard from '../../components/common/SectionCard';
+import HelpTooltip from '../../components/common/HelpTooltip';
+import EmptyState from '../../components/common/EmptyState';
 
 import { useExpiringCerts } from '../../hooks/useTraining';
 import { fetchSessions } from '../../lib/peopleApi';
@@ -15,7 +19,7 @@ import SessionDetailDrawer from '../../components/people/SessionDetailDrawer';
 import { emitTrainingChanged, emitRefreshCounters } from '../../lib/events';
 
 export default function FormationPage() {
-  const { certs, loading: loadingCerts } = useExpiringCerts(30);
+  const { certs, loading: loadingCerts } = useExpiringCerts(90);
 
   const [sessions, setSessions] = useState([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
@@ -66,6 +70,21 @@ export default function FormationPage() {
     }).length;
   }, [sessions]);
 
+  const certificationBuckets = useMemo(() => ({
+    due90: (certs || []).length,
+    due60: (certs || []).filter((cert) => cert?.expiresAt && (new Date(cert.expiresAt) - new Date()) / 86400000 <= 60).length,
+    due30: (certs || []).filter((cert) => cert?.expiresAt && (new Date(cert.expiresAt) - new Date()) / 86400000 <= 30).length,
+  }), [certs]);
+
+  const recommendations = useMemo(() => {
+    const items = [];
+    if (certificationBuckets.due30 > 0) items.push("Prioriser les certifications qui expirent sous 30 jours.");
+    if (sessionsSoon14 === 0) items.push("Planifier au moins une session prochainement pour alimenter le plan annuel.");
+    if (sessions.length > 0) items.push("Rapprocher les inscriptions des compétences critiques manquantes avant revue manager.");
+    if (!items.length) items.push("Portefeuille formation stable: maintenir le suivi des présences et renouvellements.");
+    return items.slice(0, 3);
+  }, [certificationBuckets.due30, sessionsSoon14, sessions.length]);
+
   const renderCapacity = (s) => {
     const enrolled = s.enrollments?.length || 0;
     if (!s.capacity) return <Badge className="bg-gray-100 text-gray-800">Capacité : —</Badge>;
@@ -103,53 +122,52 @@ export default function FormationPage() {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Formation &amp; Conformité</h1>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={onRefresh}>
-            <RefreshCw className="w-4 h-4 mr-2" /> Rafraîchir
-          </Button>
-          <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => setOpenCreate(true)}>
-            <Plus className="w-4 h-4 mr-2" /> Planifier une session
-          </Button>
+      <PageHeader
+        title="Formation & compétences"
+        description="Catalogue, plan annuel, certifications et alertes d’expiration à piloter simplement."
+        actions={(
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={onRefresh}>
+              <RefreshCw className="w-4 h-4 mr-2" /> Rafraîchir
+            </Button>
+            <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => setOpenCreate(true)}>
+              <Plus className="w-4 h-4 mr-2" /> Planifier une session
+            </Button>
+          </div>
+        )}
+      >
+        <div className="grid grid-cols-1 gap-3 rounded-2xl border border-emerald-100 bg-white p-4 md:grid-cols-4">
+          <div className="rounded-xl border border-slate-200 p-3"><div className="text-xs uppercase tracking-wide text-slate-500">Certifs &lt; 90 j</div><div className="mt-2 text-2xl font-bold text-slate-900">{certificationBuckets.due90}</div></div>
+          <div className="rounded-xl border border-slate-200 p-3"><div className="text-xs uppercase tracking-wide text-slate-500">Certifs &lt; 60 j</div><div className="mt-2 text-2xl font-bold text-amber-700">{certificationBuckets.due60}</div></div>
+          <div className="rounded-xl border border-slate-200 p-3"><div className="text-xs uppercase tracking-wide text-slate-500">Certifs &lt; 30 j</div><div className="mt-2 text-2xl font-bold text-rose-700">{certificationBuckets.due30}</div></div>
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800"><div className="font-medium">Assistant UX</div><div className="mt-1">Affichez d’abord les expirations proches puis ouvrez la session ou le salarié concerné.</div></div>
         </div>
-      </div>
+      </PageHeader>
 
       {/* KPIs */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5" /> Certifs à renouveler (&lt; 30 j)
+              <AlertTriangle className="w-5 h-5" /> Certifs à renouveler (90 / 60 / 30)
             </CardTitle>
           </CardHeader>
           <CardContent>
             {loadingCerts ? (
               <p className="text-sm text-gray-500">Chargement…</p>
             ) : (
-              <ul className="text-sm space-y-2">
-                {(certs || []).map((c) => (
-                  <li key={c.id} className="flex items-center justify-between">
-                    <span className="truncate">
-                      {c.employee?.firstName} {c.employee?.lastName} — {c.name}
-                    </span>
-                    <span className="text-gray-500">
-                      {c.expiresAt ? new Date(c.expiresAt).toLocaleDateString() : ''}
-                    </span>
-                  </li>
-                ))}
-                {!((certs || []).length) && (
-                  <p className="text-gray-500">Aucune expiration prévue sous 30 jours.</p>
-                )}
-              </ul>
+              <div className="space-y-2 text-sm">
+                <div className="rounded-xl border border-slate-200 px-3 py-2 flex items-center justify-between"><span>Sous 90 jours</span><Badge variant="outline">{certificationBuckets.due90}</Badge></div>
+                <div className="rounded-xl border border-slate-200 px-3 py-2 flex items-center justify-between"><span>Sous 60 jours</span><Badge className="bg-amber-100 text-amber-800">{certificationBuckets.due60}</Badge></div>
+                <div className="rounded-xl border border-slate-200 px-3 py-2 flex items-center justify-between"><span>Sous 30 jours</span><Badge className="bg-rose-100 text-rose-800">{certificationBuckets.due30}</Badge></div>
+              </div>
             )}
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader><CardTitle>Taux complétion obligatoires</CardTitle></CardHeader>
-          <CardContent><p className="text-sm text-gray-600">À connecter</p></CardContent>
+          <CardHeader><CardTitle className="inline-flex items-center gap-2">Recommandations <HelpTooltip content="Recommandation simple basée sur les certifications qui expirent et les sessions planifiées. Sans moteur IA, uniquement des règles métier explicites." /></CardTitle></CardHeader>
+          <CardContent><ul className="space-y-2 text-sm text-gray-700">{recommendations.map((item) => <li key={item} className="rounded-xl border border-slate-200 px-3 py-2">{item}</li>)}</ul></CardContent>
         </Card>
 
         <Card>
@@ -162,57 +180,58 @@ export default function FormationPage() {
       </div>
 
       {/* Liste des sessions – même look que Performance */}
-      <Card>
-        <CardHeader className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <BookOpen className="w-5 h-5" /> Sessions planifiées
-          </CardTitle>
-          <Button variant="outline" onClick={onRefresh}>Rafraîchir</Button>
-        </CardHeader>
-        <CardContent>
-          {loadingSessions ? (
-            <p className="text-sm text-gray-500">Chargement…</p>
-          ) : sessions.length ? (
-            <div className="space-y-3">
-              {sessions.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => setSelectedSession(s)}
-                  className="
-                    w-full text-left
-                    rounded-xl border border-gray-200
-                    px-4 py-3
-                    flex items-center justify-between gap-3
-                    hover:bg-gray-50 hover:shadow-sm transition
-                  "
-                >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <div className="font-medium truncate">{s.course?.title || 'Cours'}</div>
-                      {statusChip(s)}
-                    </div>
-                    <div className="mt-1 text-sm text-gray-500 truncate">
-                      {s.startDate ? new Date(s.startDate).toLocaleDateString() : '—'}
-                      {' \u2192 '}
-                      {s.endDate ? new Date(s.endDate).toLocaleDateString() : '—'}
-                      {' \u00B7 '}
-                      {s.location || '—'}
-                    </div>
+      <SectionCard
+        title={<span className="inline-flex items-center gap-2"><BookOpen className="w-5 h-5" /> Sessions planifiées <HelpTooltip content="Historique complet par salarié à ouvrir depuis le détail de session. Utilisez cette liste comme plan annuel opérationnel." /></span>}
+        description="Plan annuel, sessions à venir et capacité restante."
+      >
+        {loadingSessions ? (
+          <p className="text-sm text-gray-500">Chargement…</p>
+        ) : sessions.length ? (
+          <div className="space-y-3">
+            {sessions.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => setSelectedSession(s)}
+                className="
+                  w-full text-left
+                  rounded-xl border border-gray-200
+                  px-4 py-3
+                  flex items-center justify-between gap-3
+                  hover:bg-gray-50 hover:shadow-sm transition
+                "
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <div className="font-medium truncate">{s.course?.title || 'Cours'}</div>
+                    {statusChip(s)}
                   </div>
+                  <div className="mt-1 text-sm text-gray-500 truncate">
+                    {s.startDate ? new Date(s.startDate).toLocaleDateString() : '—'}
+                    {' \u2192 '}
+                    {s.endDate ? new Date(s.endDate).toLocaleDateString() : '—'}
+                    {' \u00B7 '}
+                    {s.location || '—'}
+                  </div>
+                </div>
 
-                  {/* badge à droite comme sur Performance */}
-                  <div className="shrink-0">
-                    {renderCapacity(s)}
-                  </div>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-gray-500">Aucune session planifiée.</p>
-          )}
-        </CardContent>
-      </Card>
+                <div className="shrink-0">
+                  {renderCapacity(s)}
+                </div>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            icon={BookOpen}
+            title="Aucune session planifiée"
+            description="Planifiez une session pour alimenter le plan de formation annuel."
+            actionLabel="Planifier une session"
+            onAction={() => setOpenCreate(true)}
+            compact
+          />
+        )}
+      </SectionCard>
 
       <SessionFormDialog
         open={openCreate}

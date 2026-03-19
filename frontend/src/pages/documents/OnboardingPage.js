@@ -13,6 +13,7 @@ import EmployeeIdentityForm from "../../components/documents/EmployeeIdentityFor
 import { z } from "zod";
 
 import { listOnboarding, startOnboarding } from "../../lib/documentsApi";
+import usePageMeta from "../../hooks/usePageMeta";
 
 const STEPS = [
   { key: "collect", label: "Infos collaborateur" },
@@ -24,6 +25,7 @@ const STEPS = [
 ];
 
 export default function OnboardingPage() {
+  usePageMeta("Parcours d’intégration", "Démarrez et suivez les intégrations salariés avec documents, pièces et étapes clés.");
   const [cases, setCases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -40,10 +42,10 @@ export default function OnboardingPage() {
   const [selectedTemplates, setSelectedTemplates] = useState([]);
 
   const [checklist, setChecklist] = useState([
-    { key: "ipres", label: "Formulaire affiliation IPRES", hint: "Impression ou signature si dispo", done: false },
-    { key: "css", label: "Formulaire affiliation CSS", done: false },
-    { key: "rib", label: "RIB récupéré", done: false },
-    { key: "id", label: "CNI/Passport collecté", done: false },
+    { key: "social", label: "Affiliation organisme social préparée", hint: "Selon le pays et le statut du salarié", done: false },
+    { key: "pension", label: "Affiliation retraite / pension préparée", done: false },
+    { key: "rib", label: "Coordonnées bancaires ou Mobile Money récupérées", done: false },
+    { key: "id", label: "Pièce d’identité collectée", done: false },
     { key: "charte", label: "Charte IT signée", done: false },
   ]);
 
@@ -100,7 +102,7 @@ export default function OnboardingPage() {
 
       await startOnboarding(payload);
 
-      toast.success("Dossier d’onboarding créé");
+      toast.success("Parcours d’intégration créé");
       window.dispatchEvent(new Event("app:counters:refresh"));
       window.dispatchEvent(new Event("documents:changed"));
 
@@ -130,7 +132,7 @@ export default function OnboardingPage() {
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Onboarding Sénégal</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Parcours d’intégration</h1>
         <div className="flex gap-2">
           <Button variant="outline" onClick={load}>
             <DownloadCloud className="w-4 h-4 mr-2" /> Rafraîchir
@@ -143,7 +145,7 @@ export default function OnboardingPage() {
           <div className="flex items-center gap-2">
             <ListChecks className="w-4 h-4" />
             <span>
-              Pack Sénégal : Contrat, IPRES, CSS, registre du personnel, check-list matériel, OTP pour signatures.
+              Base d’intégration prête pour l’Afrique de l’Ouest francophone : contrat, affiliations sociales, registre du personnel, matériel et signatures.
             </span>
           </div>
         </CardContent>
@@ -152,7 +154,7 @@ export default function OnboardingPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Rocket className="w-5 h-5" /> Démarrer un onboarding
+            <Rocket className="w-5 h-5" /> Ouvrir un parcours d’intégration
           </CardTitle>
         </CardHeader>
 
@@ -213,7 +215,7 @@ export default function OnboardingPage() {
               })}
             </div>
           ) : (
-            <p className="text-sm text-gray-500">Aucun dossier en cours.</p>
+            <p className="text-sm text-gray-500">Aucun parcours d’intégration en cours.</p>
           )}
         </CardContent>
       </Card>

@@ -38,6 +38,49 @@ body {
 /* Conteneurs scroll horizontaux stables */
 .overflow-x-auto { scrollbar-gutter: stable both-edges; }
 
+/* ============================ */
+/*     Scrollbar thème menu    */
+/* ============================ */
+:root {
+  --sb-track: rgba(6, 78, 59, 0.28);   /* emerald-900 */
+  --sb-thumb-a: #34d399;               /* emerald-400 */
+  --sb-thumb-b: #059669;               /* emerald-600 */
+  --sb-thumb-c: #065f46;               /* emerald-800 */
+}
+
+/* Firefox */
+html,
+body,
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--sb-thumb-b) var(--sb-track);
+}
+
+/* Chromium / WebKit */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--sb-track);
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--sb-thumb-a) 0%, var(--sb-thumb-b) 52%, var(--sb-thumb-c) 100%);
+  border: 1px solid rgba(4, 120, 87, 0.35);
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #6ee7b7 0%, #10b981 52%, #047857 100%);
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 /* Optionnel: garde une zone minimale pour éviter les micro-sauts à l'arrivée des données */
 .min-h-table { min-height: 320px; }
 

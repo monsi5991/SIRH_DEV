@@ -87,7 +87,7 @@ export default function EmployeeForm({ initialData = {}, onSubmit, loading = fal
             className="mt-1 w-full border rounded-lg px-3 py-2"
           />
           <p className="text-xs text-gray-500 mt-1">
-            Laisser vide pour garder le fallback démo si non renseigné.
+            Laisser vide si le salaire de base n&apos;est pas encore confirmé.
           </p>
         </div>
       </div>

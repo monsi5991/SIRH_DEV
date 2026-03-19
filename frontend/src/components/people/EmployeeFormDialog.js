@@ -17,6 +17,7 @@ const EmployeeSchema = z.object({
   position: z.string().optional().nullable(),
   status: z.enum(['ACTIVE','INACTIVE']).default('ACTIVE'),
   joinDate: z.string().optional().nullable(),          // yyyy-mm-dd
+  endDate: z.string().optional().nullable(),
   contractType: z.enum(['CDI','CDD','STAGE','INTERIM','APPRENTISSAGE']).optional().nullable(),
   cnss: z.string().optional().nullable(),
   ipres: z.string().optional().nullable(),
@@ -39,7 +40,7 @@ export default function EmployeeFormDialog({ open, onClose, onSubmit, initialDat
     defaultValues: {
       firstName:'', lastName:'', email:'',
       phone:'', department:'', site:'', position:'',
-      status:'ACTIVE', joinDate:'', contractType:'',
+      status:'ACTIVE', joinDate:'', endDate:'', contractType:'',
       cnss:'', ipres:'',
       // paie
       internalMatricule:'', baseSalary:'',
@@ -61,6 +62,7 @@ export default function EmployeeFormDialog({ open, onClose, onSubmit, initialDat
         position: initialData.position || '',
         status: initialData.status || 'ACTIVE',
         joinDate: initialData.joinDate ? String(initialData.joinDate).slice(0,10) : '',
+        endDate: initialData.endDate ? String(initialData.endDate).slice(0,10) : '',
         contractType: initialData.contractType || '',
         cnss: initialData.cnss || '',
         ipres: initialData.ipres || '',
@@ -90,6 +92,7 @@ export default function EmployeeFormDialog({ open, onClose, onSubmit, initialDat
       site: values.site || null,
       status: values.status,
       joinDate: values.joinDate || null,
+      endDate: values.endDate || null,
       contractType: values.contractType || null,
       cnss: values.cnss || null,
       ipres: values.ipres || null,
@@ -163,6 +166,10 @@ export default function EmployeeFormDialog({ open, onClose, onSubmit, initialDat
             <input type="date" className="mt-1 w-full border rounded-lg px-3 py-2" {...register('joinDate')} />
           </div>
           <div>
+            <label className="text-sm text-gray-700">Fin de contrat</label>
+            <input type="date" className="mt-1 w-full border rounded-lg px-3 py-2" {...register('endDate')} />
+          </div>
+          <div>
             <label className="text-sm text-gray-700">Type de contrat</label>
             <select className="mt-1 w-full border rounded-lg px-3 py-2" {...register('contractType')}>
               <option value="">—</option>
@@ -176,11 +183,11 @@ export default function EmployeeFormDialog({ open, onClose, onSubmit, initialDat
 
           {/* Conformité */}
           <div>
-            <label className="text-sm text-gray-700">CNSS</label>
+            <label className="text-sm text-gray-700">Réf. organisme social</label>
             <input className="mt-1 w-full border rounded-lg px-3 py-2" {...register('cnss')} />
           </div>
           <div>
-            <label className="text-sm text-gray-700">IPRES</label>
+            <label className="text-sm text-gray-700">Réf. retraite / pension</label>
             <input className="mt-1 w-full border rounded-lg px-3 py-2" {...register('ipres')} />
           </div>
 

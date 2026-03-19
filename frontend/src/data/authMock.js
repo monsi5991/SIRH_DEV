@@ -13,7 +13,7 @@ export const mockUsers = [
     permissions: ["all"],
     tenant: {
       id: "acme-sn",
-      name: "Acme Sénégal SA",
+      name: "Horizon Afrique Services",
       country: "SN",
       currency: "XOF",
       plan: "growth",
@@ -21,7 +21,7 @@ export const mockUsers = [
     },
     entity: {
       id: "acme-sn-sa",
-      name: "Acme Sénégal SA",
+      name: "Horizon Afrique Services",
       country: "SN",
       site: "Dakar",
     },
@@ -36,7 +36,7 @@ export const mockUsers = [
     permissions: ["operations_read", "operations_write", "people_read", "analytics_limited"],
     tenant: {
       id: "acme-sn",
-      name: "Acme Sénégal SA",
+      name: "Horizon Afrique Services",
       country: "SN",
       currency: "XOF",
       plan: "growth",
@@ -44,7 +44,7 @@ export const mockUsers = [
     },
     entity: {
       id: "acme-sn-sa",
-      name: "Acme Sénégal SA",
+      name: "Horizon Afrique Services",
       country: "SN",
       site: "Dakar",
     },
@@ -60,7 +60,7 @@ export const mockUsers = [
     permissions: ["self_read", "self_write", "directory_read"],
     tenant: {
       id: "acme-sn",
-      name: "Acme Sénégal SA",
+      name: "Horizon Afrique Services",
       country: "SN",
       currency: "XOF",
       plan: "growth",
@@ -68,7 +68,7 @@ export const mockUsers = [
     },
     entity: {
       id: "acme-sn-sa",
-      name: "Acme Sénégal SA",
+      name: "Horizon Afrique Services",
       country: "SN",
       site: "Dakar",
     },
@@ -81,7 +81,7 @@ export const mockUsers = [
 export const mockTenants = [
   {
     id: "acme-sn",
-    name: "Acme Sénégal SA",
+    name: "Horizon Afrique Services",
     country: "SN",
     currency: "XOF",
     plan: "growth",
@@ -94,7 +94,7 @@ export const mockTenants = [
     entities: [
       {
         id: "acme-sn-sa",
-        name: "Acme Sénégal SA",
+        name: "Horizon Afrique Services",
         country: "SN",
         site: "Dakar",
       },

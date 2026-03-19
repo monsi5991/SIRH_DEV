@@ -1,0 +1,45 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Flutter Doctor",
+      "type": "shell",
+      "command": "flutter",
+      "args": ["doctor"],
+      "options": {
+        "cwd": "${workspaceFolder}/mobile"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Flutter Create Mobile Shell",
+      "type": "shell",
+      "command": "flutter",
+      "args": ["create", "."],
+      "options": {
+        "cwd": "${workspaceFolder}/mobile"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Flutter Pub Get",
+      "type": "shell",
+      "command": "flutter",
+      "args": ["pub", "get"],
+      "options": {
+        "cwd": "${workspaceFolder}/mobile"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Flutter Run Dev",
+      "type": "shell",
+      "command": "flutter",
+      "args": ["run", "-t", "lib/main_dev.dart"],
+      "options": {
+        "cwd": "${workspaceFolder}/mobile"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

@@ -2,19 +2,33 @@ import express from "express";
 import { prisma } from "../prisma.js";
 import dayjs from "dayjs";
 import { z } from "zod";
+import { requirePermissions } from "../rbac.js";
+import {
+  buildEmployeeScopeWhere,
+  getScopedEmployeeIds,
+  resolveAccessContext,
+} from "../lib/accessScope.js";
 
 const router = express.Router();
 const getTenantId = (req) =>
   req.auth?.tid || req.user?.tenantId || req.headers["x-tenant-id"];
 
+router.use(requirePermissions(["team_read", "all"], "anyOf"));
+
 /* ---------- Certifications expirant sous X jours ---------- */
 router.get("/certifications/expiring", async (req, res) => {
   const tenantId = getTenantId(req);
+  if (!tenantId) return res.status(401).json({ message: "Unauthorized" });
+  const accessContext = await resolveAccessContext(req);
   const days = Math.max(1, parseInt(req.query.days || "30", 10));
   const until = dayjs().add(days, "day").toDate();
 
   const certs = await prisma.certification.findMany({
-    where: { tenantId, expiresAt: { lte: until } },
+    where: {
+      tenantId,
+      ...buildEmployeeScopeWhere(accessContext, { field: "employeeId" }),
+      expiresAt: { lte: until },
+    },
     orderBy: { expiresAt: "asc" },
     include: {
       employee: {
@@ -75,7 +89,7 @@ router.get("/courses", async (req, res) => {
   res.json(courses);
 });
 
-router.post("/courses", async (req, res) => {
+router.post("/courses", requirePermissions(["all"], "anyOf"), async (req, res) => {
   try {
     const tenantId = getTenantId(req);
     const p = CourseSchema.parse(req.body);
@@ -92,12 +106,26 @@ router.post("/courses", async (req, res) => {
 // Liste
 router.get("/sessions", async (req, res) => {
   const tenantId = getTenantId(req);
+  if (!tenantId) return res.status(401).json({ message: "Unauthorized" });
+  const accessContext = await resolveAccessContext(req);
+  const scopedEmployeeIds = getScopedEmployeeIds(accessContext);
+  const scopedEnrollmentFilter =
+    scopedEmployeeIds === null
+      ? {}
+      : { employeeId: { in: scopedEmployeeIds.length ? scopedEmployeeIds : ["__none__"] } };
+
   const sessions = await prisma.session.findMany({
-    where: { tenantId },
+    where: {
+      tenantId,
+      ...(scopedEmployeeIds === null
+        ? {}
+        : { enrollments: { some: scopedEnrollmentFilter } }),
+    },
     orderBy: { startDate: "desc" },
     include: {
       course: true,
       enrollments: {
+        ...(scopedEmployeeIds === null ? {} : { where: scopedEnrollmentFilter }),
         include: {
           employee: {
             select: { id: true, firstName: true, lastName: true, department: true, site: true }
@@ -112,12 +140,26 @@ router.get("/sessions", async (req, res) => {
 // Détail
 router.get("/sessions/:id", async (req, res) => {
   const tenantId = getTenantId(req);
+  if (!tenantId) return res.status(401).json({ message: "Unauthorized" });
+  const accessContext = await resolveAccessContext(req);
+  const scopedEmployeeIds = getScopedEmployeeIds(accessContext);
+  const scopedEnrollmentFilter =
+    scopedEmployeeIds === null
+      ? {}
+      : { employeeId: { in: scopedEmployeeIds.length ? scopedEmployeeIds : ["__none__"] } };
   const { id } = req.params;
   const s = await prisma.session.findFirst({
-    where: { id, tenantId },
+    where: {
+      id,
+      tenantId,
+      ...(scopedEmployeeIds === null
+        ? {}
+        : { enrollments: { some: scopedEnrollmentFilter } }),
+    },
     include: {
       course: true,
       enrollments: {
+        ...(scopedEmployeeIds === null ? {} : { where: scopedEnrollmentFilter }),
         include: {
           employee: {
             select: { id: true, firstName: true, lastName: true, department: true, site: true }
@@ -131,10 +173,15 @@ router.get("/sessions/:id", async (req, res) => {
 });
 
 // Création
-router.post("/sessions", async (req, res) => {
+router.post("/sessions", requirePermissions(["all"], "anyOf"), async (req, res) => {
   try {
     const tenantId = getTenantId(req);
     const p = SessionSchema.parse(req.body);
+    const course = await prisma.course.findFirst({
+      where: { id: p.courseId, tenantId },
+      select: { id: true },
+    });
+    if (!course) return res.status(404).json({ message: "Course not found" });
     const s = await prisma.session.create({
       data: {
         tenantId,
@@ -152,11 +199,25 @@ router.post("/sessions", async (req, res) => {
 });
 
 // ✅ Mise à jour
-router.put("/sessions/:id", async (req, res) => {
+router.put("/sessions/:id", requirePermissions(["all"], "anyOf"), async (req, res) => {
   try {
     const tenantId = getTenantId(req);
     const { id } = req.params;
     const p = SessionUpdateSchema.parse(req.body || {});
+    const existing = await prisma.session.findFirst({
+      where: { id, tenantId },
+      select: { id: true },
+    });
+    if (!existing) return res.status(404).json({ message: "Session not found" });
+
+    if (p.courseId) {
+      const course = await prisma.course.findFirst({
+        where: { id: p.courseId, tenantId },
+        select: { id: true },
+      });
+      if (!course) return res.status(404).json({ message: "Course not found" });
+    }
+
     const payload = {
       ...(p.startDate ? { startDate: new Date(p.startDate) } : {}),
       ...(p.endDate ? { endDate: new Date(p.endDate) } : {}),
@@ -181,11 +242,24 @@ router.put("/sessions/:id", async (req, res) => {
 });
 
 // Inscription
-router.post("/sessions/:id/enroll", async (req, res) => {
+router.post("/sessions/:id/enroll", requirePermissions(["all"], "anyOf"), async (req, res) => {
   try {
     const tenantId = getTenantId(req);
     const { id } = req.params;
     const p = EnrollSchema.parse(req.body);
+    const session = await prisma.session.findFirst({
+      where: { id, tenantId },
+      select: { id: true },
+    });
+    if (!session) return res.status(404).json({ message: "Session not found" });
+
+    const existingEmployees = await prisma.employee.findMany({
+      where: { tenantId, id: { in: p.employeeIds } },
+      select: { id: true },
+    });
+    if (existingEmployees.length !== p.employeeIds.length) {
+      return res.status(400).json({ message: "Some employeeIds are invalid for this tenant" });
+    }
 
     const data = p.employeeIds.map(empId => ({
       tenantId, employeeId: empId, sessionId: id, status: "enrolled"
@@ -203,7 +277,7 @@ router.post("/sessions/:id/enroll", async (req, res) => {
 });
 
 // ✅ Désinscrire (par employeeId)
-router.delete("/sessions/:id/enroll/:employeeId", async (req, res) => {
+router.delete("/sessions/:id/enroll/:employeeId", requirePermissions(["all"], "anyOf"), async (req, res) => {
   try {
     const tenantId = getTenantId(req);
     const { id, employeeId } = req.params;
@@ -224,7 +298,7 @@ router.delete("/sessions/:id/enroll/:employeeId", async (req, res) => {
 });
 
 // Dupliquer une session
-router.post("/sessions/:id/duplicate", async (req, res) => {
+router.post("/sessions/:id/duplicate", requirePermissions(["all"], "anyOf"), async (req, res) => {
   try {
     const tenantId = getTenantId(req);
     const { id } = req.params;
@@ -252,10 +326,15 @@ router.post("/sessions/:id/duplicate", async (req, res) => {
 });
 
 // Annuler une session (supprime inscriptions + session)
-router.post("/sessions/:id/cancel", async (req, res) => {
+router.post("/sessions/:id/cancel", requirePermissions(["all"], "anyOf"), async (req, res) => {
   try {
     const tenantId = getTenantId(req);
     const { id } = req.params;
+    const exists = await prisma.session.findFirst({
+      where: { id, tenantId },
+      select: { id: true },
+    });
+    if (!exists) return res.status(404).json({ message: "Session not found" });
 
     await prisma.$transaction([
       prisma.enrollment.deleteMany({ where: { sessionId: id, tenantId } }),
@@ -269,11 +348,16 @@ router.post("/sessions/:id/cancel", async (req, res) => {
 });
 
 // Marquer la présence
-router.post("/sessions/:id/attendance", async (req, res) => {
+router.post("/sessions/:id/attendance", requirePermissions(["all"], "anyOf"), async (req, res) => {
   try {
     const tenantId = getTenantId(req);
     const { id } = req.params;
     const p = AttendanceSchema.parse(req.body || {});
+    const session = await prisma.session.findFirst({
+      where: { id, tenantId },
+      select: { id: true },
+    });
+    if (!session) return res.status(404).json({ message: "Session not found" });
 
     let employeeIds = p.employeeIds;
     if (!employeeIds) {

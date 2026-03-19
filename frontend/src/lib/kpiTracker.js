@@ -1,9 +1,20 @@
 const KEY = "sirh_form_kpis_v1";
 
 function read() {
-  try { return JSON.parse(localStorage.getItem(KEY) || "{}"); } catch { return {}; }
+  try { return JSON.parse(localStorage.getItem(KEY) || "{}"); }
+  catch (e) {
+    // fallback: storage indisponible ou JSON invalide
+    void e;
+    return {};
+  }
 }
-function write(v) { try { localStorage.setItem(KEY, JSON.stringify(v)); } catch {} }
+function write(v) {
+  try { localStorage.setItem(KEY, JSON.stringify(v)); }
+  catch (e) {
+    // fallback: quota/private mode
+    void e;
+  }
+}
 
 export function kpiStart(module) {
   const data = read();

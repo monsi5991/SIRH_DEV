@@ -16,6 +16,7 @@ export function useDebouncedValue(value, delay = 300) {
 function normalizeList(res) {
   if (!res) return { items: [], total: 0 };
   if (Array.isArray(res)) return { items: res, total: res.length };
+  if (Array.isArray(res.employees)) return { items: res.employees, total: Number(res.total ?? res.employees.length) };
   if (Array.isArray(res.items)) return { items: res.items, total: Number(res.total ?? res.items.length) };
   if (Array.isArray(res.data)) return { items: res.data, total: Number(res.total ?? res.data.length) };
   return { items: [], total: 0 };
@@ -136,7 +137,7 @@ export function useEmployeeDetail(employeeId) {
         return await get(`/employees/${employeeId}`, { signal: controller.signal });
       });
 
-      setEmployee(res || null);
+      setEmployee(res?.employee || res?.item || res || null);
     } catch (e) {
       if (controller.signal.aborted) return;
       setEmployee(null);
@@ -185,28 +186,9 @@ export async function uploadEmployeeDocument(employeeId, payload) {
   if (type) fd.append("type", type);
   if (expiresAt) fd.append("expiresAt", expiresAt);
 
-  // On utilise fetch brut ici, car on doit envoyer FormData
-  const baseUrl = import.meta.env?.VITE_API_URL || "http://localhost:4000";
-
-  // Essai nouvelle route
-  let res = await fetch(`${baseUrl}/people/employees/${employeeId}/documents`, {
-    method: "POST",
-    body: fd,
-    headers: {}, // laisser vide pour que le boundary FormData soit géré
-  });
-
-  if (!res.ok) {
-    // Fallback legacy
-    res = await fetch(`${baseUrl}/employees/${employeeId}/documents`, {
-      method: "POST",
-      body: fd,
-      headers: {},
-    });
+  try {
+    return await post(`/people/employees/${employeeId}/documents`, fd);
+  } catch (_) {
+    return await post(`/employees/${employeeId}/documents`, fd);
   }
-
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(data?.error || data?.message || "upload_failed");
-  }
-  return data?.document || data;
 }

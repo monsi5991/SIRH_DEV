@@ -55,6 +55,16 @@ model Tenant {
   PolicyVersion        PolicyVersion[]
   PolicyAck            PolicyAck[]
   AuditEvent           AuditEvent[]
+  HrRequest            HrRequest[]
+  InterviewCampaign    InterviewCampaign[]
+  Interview            Interview[]
+  WorkflowDefinition   WorkflowDefinition[]
+  WorkflowInstance     WorkflowInstance[]
+  WorkflowAction       WorkflowAction[]
+  Notification         Notification[]
+  leaveTypes               LeaveType[]
+  employeeLeaveBalances    EmployeeLeaveBalance[]
+  leaveBalanceLedgerEntries LeaveBalanceLedgerEntry[]
 
   // 👇 back-relations ajoutées
   LeaveActionLog LeaveActionLog[]
@@ -75,6 +85,8 @@ model User {
   id            String         @id @default(cuid())
   email         String         @unique
   passwordHash  String
+  keycloakSub   String?
+  keycloakIssuer String?
   firstName     String
   lastName      String
   tenant        Tenant         @relation(fields: [tenantId], references: [id])
@@ -86,9 +98,15 @@ model User {
   createdAt     DateTime       @default(now())
 
   // 🔧 back-relation 1:1 vers Employee
-  employee Employee? @relation(name: "UserEmployee")
+  employee           Employee?      @relation(name: "UserEmployee")
+  hrRequests         HrRequest[]    @relation("HrRequestRequester")
+  interviewsToRun    Interview[]    @relation("InterviewManager")
+  notificationsSent  Notification[] @relation("NotificationSender")
+  notificationsInbox Notification[] @relation("NotificationRecipient")
 
   @@index([tenantId])
+  @@index([keycloakSub])
+  @@unique([keycloakIssuer, keycloakSub], name: "keycloakIssuer_keycloakSub")
 }
 
 model Role {
@@ -163,6 +181,7 @@ model Leave {
   // 👇 back-relations vers logs & comments
   actionLogs LeaveActionLog[]
   comments   LeaveComment[]
+  ledger     LeaveBalanceLedgerEntry[]
 
   @@index([tenantId])
   @@index([tenantId, employeeId, start, end])
@@ -199,6 +218,125 @@ model LeaveComment {
   Tenant Tenant @relation(fields: [tenantId], references: [id])
 
   @@index([tenantId, leaveId, createdAt])
+}
+
+enum LeaveTypeCategory {
+  VACATION
+  RTT
+  SICK
+  PARENTAL
+  EXCEPTIONAL
+  UNPAID
+  OTHER
+}
+
+enum LeaveTypeUnit {
+  DAY
+  HOUR
+}
+
+enum LeaveLedgerDirection {
+  CREDIT
+  DEBIT
+}
+
+enum LeaveLedgerReason {
+  OPENING
+  ACCRUAL
+  CONSUMPTION
+  PENDING_RESERVE
+  PENDING_RELEASE
+  ADJUSTMENT
+  CARRYOVER
+  MANUAL_CORRECTION
+}
+
+model LeaveType {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  code                   String
+  label                  String
+  category               LeaveTypeCategory @default(OTHER)
+  unit                   LeaveTypeUnit     @default(DAY)
+  defaultAnnualAllowance Float             @default(0)
+  carryoverLimit         Float?
+  requiresDocument       Boolean           @default(false)
+  isActive               Boolean           @default(true)
+  country                String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  balances EmployeeLeaveBalance[]
+  ledger   LeaveBalanceLedgerEntry[]
+
+  @@unique([tenantId, code], name: "tenantId_code_leave_type")
+  @@index([tenantId, isActive, category])
+}
+
+model EmployeeLeaveBalance {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  leaveTypeId String
+  leaveType   LeaveType @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
+
+  periodYear Int
+
+  openingBalance Float @default(0)
+  accrued        Float @default(0)
+  consumed       Float @default(0)
+  pending        Float @default(0)
+  adjustments    Float @default(0)
+  available      Float @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ledgerEntries LeaveBalanceLedgerEntry[]
+
+  @@unique([tenantId, employeeId, leaveTypeId, periodYear], name: "tenant_employee_leave_type_period")
+  @@index([tenantId, employeeId, periodYear])
+}
+
+model LeaveBalanceLedgerEntry {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  leaveTypeId String
+  leaveType   LeaveType @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
+
+  balanceId String?
+  balance   EmployeeLeaveBalance? @relation(fields: [balanceId], references: [id], onDelete: SetNull)
+
+  leaveId String?
+  leave   Leave? @relation(fields: [leaveId], references: [id], onDelete: SetNull)
+
+  periodYear Int
+
+  direction LeaveLedgerDirection
+  reason    LeaveLedgerReason
+  quantity  Float
+  note      String?
+  meta      Json?
+  occurredAt DateTime @default(now())
+  createdBy  String?
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId, employeeId, periodYear])
+  @@index([tenantId, leaveTypeId, periodYear])
+  @@index([tenantId, reason, occurredAt])
+  @@index([tenantId, leaveId])
 }
 
 model Timesheet {
@@ -341,8 +479,13 @@ model Employee {
   onboardingCases  OnboardingCase[]
   offboardingCases OffboardingCase[]
 
-  complianceTasks ComplianceTask[]
-  policyAcks      PolicyAck[]
+  complianceTasks   ComplianceTask[]
+  policyAcks        PolicyAck[]
+  hrRequests        HrRequest[]      @relation("HrRequestEmployee")
+  interviews        Interview[]      @relation("InterviewEmployee")
+  managedInterviews Interview[]      @relation("InterviewManagerEmployee")
+  leaveBalances     EmployeeLeaveBalance[]
+  leaveLedger       LeaveBalanceLedgerEntry[]
 
   createdAt  DateTime     @default(now())
   updatedAt  DateTime     @updatedAt
@@ -705,4 +848,299 @@ model AuditEvent {
   createdAt DateTime @default(now())
 
   @@index([tenantId, type, createdAt])
+}
+
+enum WorkflowModule {
+  LEAVE
+  EXPENSE
+  HR_REQUEST
+  TRAINING
+  DOCUMENT
+  OTHER
+}
+
+enum WorkflowApproverType {
+  MANAGER
+  HR
+  ROLE
+  USER
+}
+
+enum WorkflowInstanceStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELED
+}
+
+enum WorkflowActionType {
+  SUBMIT
+  APPROVE
+  REJECT
+  REASSIGN
+  COMMENT
+  CANCEL
+  ESCALATE
+}
+
+model WorkflowDefinition {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  code     String
+  name     String
+  module   WorkflowModule
+  isActive Boolean        @default(true)
+  maxLevel Int            @default(1)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  steps     WorkflowStep[]
+  instances WorkflowInstance[]
+
+  @@unique([tenantId, code], name: "tenantId_code_workflow")
+  @@index([tenantId, module, isActive])
+}
+
+model WorkflowStep {
+  id                   String             @id @default(cuid())
+  workflowDefinitionId String
+  workflowDefinition   WorkflowDefinition @relation(fields: [workflowDefinitionId], references: [id], onDelete: Cascade)
+
+  level          Int
+  approverType   WorkflowApproverType
+  approverRole   String?
+  approverUserId String?
+  slaHours       Int?
+  isRequired     Boolean              @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([workflowDefinitionId, level], name: "workflowDefinitionId_level")
+  @@index([workflowDefinitionId, approverType])
+}
+
+model WorkflowInstance {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  definitionId String?
+  definition   WorkflowDefinition? @relation(fields: [definitionId], references: [id], onDelete: SetNull)
+
+  module        WorkflowModule
+  resourceType  String
+  resourceId    String
+  status        WorkflowInstanceStatus @default(PENDING)
+  currentLevel  Int                    @default(1)
+  requestedById String?
+  assignedToId  String?
+  submittedAt   DateTime               @default(now())
+  decidedAt     DateTime?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
+  actions   WorkflowAction[]
+  hrRequest HrRequest?       @relation("HrRequestWorkflow")
+
+  @@unique([tenantId, module, resourceType, resourceId], name: "tenant_module_resource_unique")
+  @@index([tenantId, status, module])
+  @@index([tenantId, assignedToId, status])
+}
+
+model WorkflowAction {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  instanceId String
+  instance   WorkflowInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  actorId String?
+  action  WorkflowActionType
+  level   Int?
+  comment String?
+  payload Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, instanceId, createdAt])
+  @@index([tenantId, actorId, createdAt])
+}
+
+enum HrRequestType {
+  ATTESTATION
+  DATA_CHANGE
+  REMOTE_WORK
+  IT_ACCESS
+  PAYROLL_SUPPORT
+  OTHER
+}
+
+enum HrRequestStatus {
+  DRAFT
+  SUBMITTED
+  PENDING_MANAGER
+  PENDING_HR
+  APPROVED
+  REJECTED
+  CANCELED
+  CLOSED
+}
+
+enum PriorityLevel {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+model HrRequest {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  requesterUserId String?
+  requesterUser   User?   @relation("HrRequestRequester", fields: [requesterUserId], references: [id], onDelete: SetNull)
+
+  employeeId String?
+  employee   Employee? @relation("HrRequestEmployee", fields: [employeeId], references: [id], onDelete: SetNull)
+
+  type              HrRequestType
+  title             String
+  description       String?
+  payload           Json?
+  status            HrRequestStatus @default(SUBMITTED)
+  priority          PriorityLevel   @default(NORMAL)
+  currentApproverId String?
+  slaDueAt          DateTime?
+  submittedAt       DateTime        @default(now())
+  resolvedAt        DateTime?
+
+  workflowInstanceId String?           @unique
+  workflowInstance   WorkflowInstance? @relation("HrRequestWorkflow", fields: [workflowInstanceId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, status, type])
+  @@index([tenantId, employeeId, createdAt])
+  @@index([tenantId, requesterUserId, createdAt])
+  @@index([tenantId, currentApproverId, status])
+}
+
+enum InterviewType {
+  ANNUAL
+  PROBATION
+  MID_YEAR
+  ONE_ON_ONE
+  EXIT
+  OTHER
+}
+
+enum InterviewStatus {
+  PLANNED
+  IN_PROGRESS
+  DONE
+  CANCELED
+}
+
+model InterviewCampaign {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  name   String
+  period String?
+  type   InterviewType @default(ANNUAL)
+  status String        @default("open")
+
+  startDate DateTime?
+  endDate   DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  interviews Interview[]
+
+  @@index([tenantId, status, type])
+  @@index([tenantId, startDate, endDate])
+}
+
+model Interview {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  campaignId String?
+  campaign   InterviewCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  employeeId String
+  employee   Employee @relation("InterviewEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+
+  managerEmployeeId String?
+  managerEmployee   Employee? @relation("InterviewManagerEmployee", fields: [managerEmployeeId], references: [id], onDelete: SetNull)
+
+  managerUserId String?
+  managerUser   User?   @relation("InterviewManager", fields: [managerUserId], references: [id], onDelete: SetNull)
+
+  type   InterviewType   @default(ANNUAL)
+  status InterviewStatus @default(PLANNED)
+
+  scheduledAt DateTime?
+  startedAt   DateTime?
+  completedAt DateTime?
+  summary     String?
+  score       Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, status, scheduledAt])
+  @@index([tenantId, employeeId, status])
+  @@index([tenantId, managerEmployeeId, status])
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  SMS
+  WHATSAPP
+  PUSH
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+  READ
+}
+
+model Notification {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  userId String?
+  user   User?   @relation("NotificationRecipient", fields: [userId], references: [id], onDelete: SetNull)
+
+  actorId String?
+  actor   User?   @relation("NotificationSender", fields: [actorId], references: [id], onDelete: SetNull)
+
+  channel NotificationChannel @default(IN_APP)
+  type    String
+  title   String
+  body    String
+  data    Json?
+  status  NotificationStatus  @default(PENDING)
+  readAt  DateTime?
+  sentAt  DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, userId, status, createdAt])
+  @@index([tenantId, actorId, createdAt])
 }

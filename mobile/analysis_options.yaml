@@ -1,0 +1,14 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  errors:
+    missing_required_param: error
+    missing_return: error
+
+linter:
+  rules:
+    prefer_const_constructors: true
+    prefer_const_declarations: true
+    avoid_print: true
+    use_key_in_widget_constructors: true
+    always_use_package_imports: true

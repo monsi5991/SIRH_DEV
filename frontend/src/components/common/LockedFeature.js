@@ -6,7 +6,6 @@ import { Card, CardContent } from '../ui/card';
 import { Badge } from '../ui/badge';
 
 const LockedFeature = ({ 
-  feature, 
   requiredPlan = 'panafrica',
   title,
   description,
@@ -14,15 +13,6 @@ const LockedFeature = ({
   illustration
 }) => {
   const { t, currentTenant } = useApp();
-
-  const planHierarchy = {
-    essential: 1,
-    growth: 2, 
-    panafrica: 3
-  };
-
-  const currentPlanLevel = planHierarchy[currentTenant.plan] || 0;
-  const requiredPlanLevel = planHierarchy[requiredPlan] || 3;
 
   const handleUpgrade = () => {
     console.log(`Upgrade to ${requiredPlan} plan`);

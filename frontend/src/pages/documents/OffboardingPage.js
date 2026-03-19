@@ -13,18 +13,20 @@ import EmployeeIdentityForm from "../../components/documents/EmployeeIdentityFor
 import { z } from "zod";
 
 import { listOffboarding, startOffboarding } from "../../lib/documentsApi";
+import usePageMeta from "../../hooks/usePageMeta";
 
 const STEPS = [
   { key: "letter", label: "Lettre de sortie" },
   { key: "approvals", label: "Approbations internes" },
   { key: "finalpay", label: "Solde de tout compte" },
   { key: "equipment", label: "Restitution équipements" },
-  { key: "orgs", label: "Déclarations IPRES/CSS" },
+  { key: "orgs", label: "Déclarations organismes sociaux" },
   { key: "docs", label: "Certificat & attestation" },
   { key: "archive", label: "Clôture & archivage" },
 ];
 
 export default function OffboardingPage() {
+  usePageMeta("Parcours de sortie", "Pilotez les départs salariés avec check-list, documents, validations et clôture du dossier.");
   const [cases, setCases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -99,7 +101,7 @@ export default function OffboardingPage() {
 
       await startOffboarding(payload);
 
-      toast.success("Dossier d’offboarding créé");
+      toast.success("Parcours de sortie créé");
       window.dispatchEvent(new Event("app:counters:refresh"));
       window.dispatchEvent(new Event("documents:changed"));
 
@@ -129,7 +131,7 @@ export default function OffboardingPage() {
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Offboarding Sénégal</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Parcours de sortie</h1>
         <div className="flex gap-2">
           <Button variant="outline" onClick={load}>
             <DownloadCloud className="w-4 h-4 mr-2" /> Rafraîchir
@@ -142,7 +144,7 @@ export default function OffboardingPage() {
           <div className="flex items-center gap-2">
             <ListChecks className="w-4 h-4" />
             <span>
-              Lettrage, workflow d’approbations, solde de tout compte, restitutions, déclarations IPRES/CSS, certificats.
+              Préparez les départs avec validations, solde de tout compte, restitutions, déclarations sociales et documents de sortie.
             </span>
           </div>
         </CardContent>
@@ -151,7 +153,7 @@ export default function OffboardingPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Rocket className="w-5 h-5" /> Démarrer un offboarding
+            <Rocket className="w-5 h-5" /> Ouvrir un parcours de sortie
           </CardTitle>
         </CardHeader>
 
@@ -212,7 +214,7 @@ export default function OffboardingPage() {
               })}
             </div>
           ) : (
-            <p className="text-sm text-gray-500">Aucun dossier en cours.</p>
+            <p className="text-sm text-gray-500">Aucun parcours de sortie en cours.</p>
           )}
         </CardContent>
       </Card>

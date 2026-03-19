@@ -1,6 +1,7 @@
 import express from "express";
 import { prisma } from "../../prisma.js";
 import { requirePermissions } from "../../rbac.js";
+import { resolveAccessContext } from "../../lib/accessScope.js";
 
 const router = express.Router();
 
@@ -12,6 +13,8 @@ router.get("/", async (req, res) => {
   try {
     const { type, from, to } = req.query;
     const tid = req.auth.tid;
+    const accessContext = await resolveAccessContext(req);
+    if (accessContext.scope === "SELF") return res.json({ events: [] });
 
     const where = { tenantId: tid };
     if (type) where.type = String(type);
@@ -36,6 +39,8 @@ router.get("/", async (req, res) => {
 
 router.post("/", requirePermissions(["operations_write"], "anyOf"), async (req, res) => {
   try {
+    const accessContext = await resolveAccessContext(req);
+    if (accessContext.scope === "SELF") return res.status(403).json({ error: "Forbidden" });
     const { title, date, time, type, description, location, attendees } = req.body;
     if (!title || !date) return res.status(400).json({ error: "title et date sont requis" });
 
@@ -62,6 +67,8 @@ router.delete("/:id", requirePermissions(["operations_write"], "anyOf"), async (
   try {
     const { id } = req.params;
     const tid = req.auth.tid;
+    const accessContext = await resolveAccessContext(req);
+    if (accessContext.scope === "SELF") return res.status(403).json({ error: "Forbidden" });
 
     const exists = await prisma.event.findFirst({
       where: { id, tenantId: tid },
